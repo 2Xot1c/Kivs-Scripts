@@ -10,8 +10,9 @@ local TOGGLE_KEY = Enum.KeyCode.LeftAlt
 local TWEEN_INFO = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local SWITCH_TWEEN = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local THEME_TWEEN = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local EXPAND_TWEEN = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
--- Access key (the GUI stays locked until this is typed into the key screen)
+-- Access key (the GUI stays locked until this is typed into the key box)
 local ACCESS_KEY = "KivsScriptsUni1"
 
 -- The style the GUI always starts on
@@ -20,7 +21,7 @@ local DEFAULT_STYLE = "Classic"
 -- Branding
 local HEADER_TEXT = "Universal #1"
 local WATERMARK_TEXT = "By Kivs"
-local VERSION_TEXT = "1.0.2"  -- update log number (bottom right), bumped on every script update
+local VERSION_TEXT = "1.0.3"  -- update log number (bottom right), bumped on every script update
 
 -- Warning label settings
 local WARNING_ICON = "⚠"  -- if this shows as a box in your game, change it to "!"
@@ -30,6 +31,7 @@ local WARNING_COLOR = Color3.fromRGB(255, 70, 70)
 -- Panel size
 local PANEL_WIDTH = 280
 local PANEL_HEIGHT = 320
+local GATE_HEIGHT = 120      -- height of the small panel shown while the key is still needed
 local OUTLINE_THICKNESS = 2  -- used by styles that have outline = true
 
 -- Range limits (in studs): ESP and Lines only show for players this close or closer
@@ -194,10 +196,35 @@ local function applyTheme(theme)
 	end
 end
 
--- Everything that needs to fade with the GUI gets registered here
-local fadeItems = {}
+-- Fade lists:
+--  contentItems = everything inside the panel once it is unlocked
+--  shellItems   = the panel background/outline (and the key box while locked)
+local contentItems = {}
+local shellItems = {}
+
 local function registerFade(obj, props)
-	table.insert(fadeItems, { obj, props })
+	table.insert(contentItems, { obj, props })
+end
+
+local function registerShellFade(obj, props)
+	table.insert(shellItems, { obj, props })
+end
+
+local function fadeList(items, target, animate)
+	for _, item in ipairs(items) do
+		local obj, props = item[1], item[2]
+		local goal = {}
+		for prop in pairs(props) do
+			goal[prop] = target
+		end
+		if animate then
+			TweenService:Create(obj, TWEEN_INFO, goal):Play()
+		else
+			for prop, value in pairs(goal) do
+				obj[prop] = value
+			end
+		end
+	end
 end
 
 -- Input helpers
@@ -247,15 +274,16 @@ linesGui.IgnoreGuiInset = true
 linesGui.DisplayOrder = 5
 linesGui.Parent = playerGui
 
--- Main panel
+-- Main panel (starts small for the key box, then grows to the full size once unlocked)
 local frame = Instance.new("Frame")
 frame.Name = "DraggableFrame"
-frame.Size = UDim2.new(0, PANEL_WIDTH, 0, PANEL_HEIGHT)
-frame.Position = UDim2.new(0.5, -PANEL_WIDTH / 2, 0.5, -PANEL_HEIGHT / 2)
+frame.Size = UDim2.new(0, PANEL_WIDTH, 0, GATE_HEIGHT)
+frame.AnchorPoint = Vector2.new(0.5, 0.5)
+frame.Position = UDim2.new(0.5, 0, 0.5, 0)
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Parent = screenGui
-registerFade(frame, { BackgroundTransparency = true })
+registerShellFade(frame, { BackgroundTransparency = true })
 onTheme(function(t, a) tweenColor(frame, "BackgroundColor3", t.bg, a) end)
 
 local corner = Instance.new("UICorner")
@@ -267,7 +295,7 @@ local frameStroke = Instance.new("UIStroke")
 frameStroke.Thickness = 0
 frameStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 frameStroke.Parent = frame
-registerFade(frameStroke, { Transparency = true })
+registerShellFade(frameStroke, { Transparency = true })
 onTheme(function(t, a)
 	tweenColor(frameStroke, "Color", t.text, a)
 	tweenColor(frameStroke, "Thickness", t.outline and OUTLINE_THICKNESS or 0, a)
@@ -1216,23 +1244,6 @@ local isOpen = false
 local toggleId = 0
 local unlocked = false -- becomes true once the correct key has been entered
 
-local function fadeTo(target, animate)
-	for _, item in ipairs(fadeItems) do
-		local obj, props = item[1], item[2]
-		local goal = {}
-		for prop in pairs(props) do
-			goal[prop] = target
-		end
-		if animate then
-			TweenService:Create(obj, TWEEN_INFO, goal):Play()
-		else
-			for prop, value in pairs(goal) do
-				obj[prop] = value
-			end
-		end
-	end
-end
-
 local function applyState(open, animate)
 	isOpen = open
 	toggleId += 1
@@ -1244,7 +1255,11 @@ local function applyState(open, animate)
 		frame.Visible = true
 	end
 
-	fadeTo(open and 0 or 1, animate)
+	local target = open and 0 or 1
+	fadeList(shellItems, target, animate)
+	if unlocked then
+		fadeList(contentItems, target, animate)
+	end
 
 	if not animate then
 		frame.Visible = open
@@ -1260,36 +1275,25 @@ local function applyState(open, animate)
 	end
 end
 
--- The GUI starts hidden; the key screen opens it once the key is correct
-applyState(false, false)
-
 UserInputService.InputBegan:Connect(function(input)
-	if not unlocked then return end
 	if input.KeyCode == TOGGLE_KEY and not UserInputService:GetFocusedTextBox() then
 		applyState(not isOpen, true)
 	end
 end)
 
--- Key screen: a blank screen with only a text box. Press Enter to submit.
-local function createKeyGate(onSuccess)
-	local gateGui = Instance.new("ScreenGui")
-	gateGui.Name = "KeyGate"
-	gateGui.ResetOnSpawn = false
-	gateGui.IgnoreGuiInset = true
-	gateGui.DisplayOrder = 100
-	gateGui.Parent = playerGui
-
-	local cover = Instance.new("Frame")
-	cover.Name = "Cover"
-	cover.Size = UDim2.new(1, 0, 1, 0)
-	cover.BackgroundColor3 = currentTheme.bg
-	cover.BorderSizePixel = 0
-	cover.Active = true -- blocks clicks from reaching anything behind it
-	cover.Parent = gateGui
+-- Key box on the panel: while locked, the panel is small and shows only a text box.
+-- Type the key and press Enter. The full GUI is revealed once the key is correct.
+local function createKeyGate()
+	-- Hide all the normal content while locked
+	header.Visible = false
+	watermark.Visible = false
+	versionLabel.Visible = false
+	list.Visible = false
+	stylesPage.Visible = false
 
 	local box = Instance.new("TextBox")
 	box.Name = "KeyBox"
-	box.Size = UDim2.new(0, 300, 0, 44)
+	box.Size = UDim2.new(1, -48, 0, 44)
 	box.AnchorPoint = Vector2.new(0.5, 0.5)
 	box.Position = UDim2.new(0.5, 0, 0.5, 0)
 	box.BackgroundColor3 = currentTheme.button
@@ -1301,7 +1305,7 @@ local function createKeyGate(onSuccess)
 	box.Font = Enum.Font.GothamMedium
 	box.TextSize = 18
 	box.ClearTextOnFocus = false
-	box.Parent = cover
+	box.Parent = frame
 
 	local boxCorner = Instance.new("UICorner")
 	boxCorner.CornerRadius = UDim.new(0, 12)
@@ -1316,15 +1320,25 @@ local function createKeyGate(onSuccess)
 	-- Shown only after a wrong key
 	local errorLabel = Instance.new("TextLabel")
 	errorLabel.Name = "Error"
-	errorLabel.Size = UDim2.new(0, 300, 0, 20)
+	errorLabel.Size = UDim2.new(1, -28, 0, 20)
 	errorLabel.AnchorPoint = Vector2.new(0.5, 0)
-	errorLabel.Position = UDim2.new(0.5, 0, 0.5, 34)
+	errorLabel.Position = UDim2.new(0.5, 0, 0.5, 32)
 	errorLabel.BackgroundTransparency = 1
 	errorLabel.Text = ""
 	errorLabel.TextColor3 = WARNING_COLOR
 	errorLabel.TextSize = 14
 	errorLabel.Font = Enum.Font.GothamBold
-	errorLabel.Parent = cover
+	errorLabel.Parent = frame
+
+	-- These fade in/out with the panel while the key box is showing
+	local gateEntries = {
+		{ box, { BackgroundTransparency = true, TextTransparency = true } },
+		{ boxStroke, { Transparency = true } },
+		{ errorLabel, { TextTransparency = true } },
+	}
+	for _, entry in ipairs(gateEntries) do
+		table.insert(shellItems, entry)
+	end
 
 	local finished = false
 
@@ -1337,16 +1351,31 @@ local function createKeyGate(onSuccess)
 			finished = true
 			errorLabel.Text = ""
 
-			-- Fade the key screen away, then open the GUI
-			local fadeInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-			TweenService:Create(cover, fadeInfo, { BackgroundTransparency = 1 }):Play()
-			TweenService:Create(box, fadeInfo, { BackgroundTransparency = 1, TextTransparency = 1 }):Play()
-			TweenService:Create(boxStroke, fadeInfo, { Transparency = 1 }):Play()
+			-- Fade the key box away
+			TweenService:Create(box, TWEEN_INFO, { BackgroundTransparency = 1, TextTransparency = 1 }):Play()
+			TweenService:Create(boxStroke, TWEEN_INFO, { Transparency = 1 }):Play()
 
-			onSuccess()
+			-- Reveal the full GUI: the panel grows and the content fades in
+			unlocked = true
+			header.Visible = true
+			watermark.Visible = true
+			versionLabel.Visible = true
+			showPage("main")
+			TweenService:Create(frame, EXPAND_TWEEN, {
+				Size = UDim2.new(0, PANEL_WIDTH, 0, PANEL_HEIGHT),
+			}):Play()
+			fadeList(contentItems, 0, true)
 
-			task.delay(0.35, function()
-				gateGui:Destroy()
+			-- Clean up the key box
+			task.delay(TWEEN_INFO.Time + 0.05, function()
+				for _, entry in ipairs(gateEntries) do
+					local index = table.find(shellItems, entry)
+					if index then
+						table.remove(shellItems, index)
+					end
+				end
+				box:Destroy()
+				errorLabel:Destroy()
 			end)
 		else
 			-- Wrong key: say so, clear the box and let them try again
@@ -1367,7 +1396,9 @@ local function createKeyGate(onSuccess)
 	end)
 end
 
-createKeyGate(function()
-	unlocked = true
-	applyState(true, true)
-end)
+createKeyGate()
+
+-- Start with the content invisible, then fade the small key panel in
+fadeList(contentItems, 1, false)
+applyState(false, false)
+applyState(true, true)
