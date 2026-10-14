@@ -11,170 +11,201 @@ local TWEEN_INFO = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirecti
 local SWITCH_TWEEN = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local THEME_TWEEN = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local EXPAND_TWEEN = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local SHINE_TWEEN = TweenInfo.new(2.6, Enum.EasingStyle.Linear, Enum.EasingDirection.In, -1)
 
--- Access key (the GUI stays locked until this is typed into the key box)
 local ACCESS_KEY = "KivsScriptsUni1"
-
--- The style the GUI always starts on
+local DISCORD_TEXT = "discord.gg/9xYm9gmUq9"
 local DEFAULT_STYLE = "Classic"
 
--- Branding
 local HEADER_TEXT = "Universal #1"
 local WATERMARK_TEXT = "By Kivs"
-local VERSION_TEXT = "1.0.3"  -- update log number (bottom right), bumped on every script update
+local VERSION_TEXT = "1.1.0"
 
--- Warning label settings
-local WARNING_ICON = "⚠"  -- if this shows as a box in your game, change it to "!"
+local WARNING_ICON = "⚠"
 local WARNING_TEXT = "WARNING - THIS OPTION HAS HIGH RISK OF A BAN. USE AT YOUR OWN RISK."
 local WARNING_COLOR = Color3.fromRGB(255, 70, 70)
 
--- Panel size
-local PANEL_WIDTH = 280
-local PANEL_HEIGHT = 320
-local GATE_HEIGHT = 120      -- height of the small panel shown while the key is still needed
-local OUTLINE_THICKNESS = 2  -- used by styles that have outline = true
+local GATE_COLOR = Color3.fromRGB(230, 40, 40)
+local GATE_SHINE = Color3.fromRGB(255, 255, 255)
+local FLASH_COLOR = Color3.fromRGB(255, 255, 255)
+local SUCCESS_COLOR = Color3.fromRGB(50, 220, 90)
+local SUCCESS_SHINE = Color3.fromRGB(200, 255, 215)
 
--- Range limits (in studs): ESP and Lines only show for players this close or closer
-local ESP_MAX_DISTANCE = 200
-local LINES_MAX_DISTANCE = 200
+local PANEL_WIDTH = 300
+local PANEL_HEIGHT = 340
+local GATE_WIDTH = 340
+local GATE_HEIGHT = 180
+local OUTLINE_THICKNESS = 2
 
--- Default colors (changeable in the GUI)
+local MAX_DISTANCE = 200
+
+local LINE_THICKNESS = 2
+local BOX_THICKNESS = 2
+local SKELETON_THICKNESS = 2
+
 local DEFAULT_ESP_COLOR = Color3.fromRGB(255, 60, 60)
+local DEFAULT_NAMES_COLOR = Color3.fromRGB(255, 255, 255)
+local DEFAULT_HEALTH_COLOR = Color3.fromRGB(70, 255, 100)
+local DEFAULT_BOX_COLOR = Color3.fromRGB(255, 60, 60)
+local DEFAULT_SKELETON_COLOR = Color3.fromRGB(255, 255, 255)
 local DEFAULT_LINE_COLOR = Color3.fromRGB(255, 60, 60)
 local DEFAULT_LOCKED_COLOR = Color3.fromRGB(70, 255, 100)
 
 local ESP_OUTLINE_COLOR = Color3.fromRGB(255, 255, 255)
-local LINE_THICKNESS = 2
 
--- Speed slider settings
 local MIN_SPEED = 4
 local MAX_SPEED = 100
-local DEFAULT_SPEED = 16   -- Roblox's normal walk speed; the tick above the slider points here
+local DEFAULT_SPEED = 16
 
--- Swatches for the ESP and Lines color rows
 local COLOR_PALETTE = {
-	Color3.fromRGB(255, 60, 60),   -- red
-	Color3.fromRGB(255, 150, 40),  -- orange
-	Color3.fromRGB(255, 220, 60),  -- yellow
-	Color3.fromRGB(60, 220, 255),  -- cyan
-	Color3.fromRGB(70, 120, 255),  -- blue
-	Color3.fromRGB(170, 90, 255),  -- purple
-	Color3.fromRGB(255, 255, 255), -- white
+	Color3.fromRGB(255, 60, 60),
+	Color3.fromRGB(255, 150, 40),
+	Color3.fromRGB(255, 220, 60),
+	Color3.fromRGB(60, 220, 255),
+	Color3.fromRGB(70, 120, 255),
+	Color3.fromRGB(170, 90, 255),
+	Color3.fromRGB(255, 255, 255),
 }
 
--- Swatches for the Lock color row (the color of the line to your locked target)
-local LOCK_PALETTE = {
-	Color3.fromRGB(70, 255, 100),  -- green
-	Color3.fromRGB(255, 220, 60),  -- yellow
-	Color3.fromRGB(255, 150, 40),  -- orange
-	Color3.fromRGB(255, 100, 200), -- pink
-	Color3.fromRGB(60, 220, 255),  -- cyan
-	Color3.fromRGB(170, 90, 255),  -- purple
-	Color3.fromRGB(255, 255, 255), -- white
+local ACCENT_PALETTE = {
+	Color3.fromRGB(70, 255, 100),
+	Color3.fromRGB(255, 220, 60),
+	Color3.fromRGB(255, 150, 40),
+	Color3.fromRGB(255, 100, 200),
+	Color3.fromRGB(60, 220, 255),
+	Color3.fromRGB(170, 90, 255),
+	Color3.fromRGB(255, 255, 255),
 }
 
--- Lock settings (distances are in pixels from the center of the screen)
-local LOCK_ACQUIRE_RADIUS = 150  -- a head must be this close to the center to get locked
-local LOCK_RELEASE_RADIUS = 200  -- pull your view farther than this to drop the lock
-local LOCK_SWITCH_MARGIN = 10    -- a new player must be this many pixels closer to center to steal the lock
-local LOCK_SMOOTHNESS = 0.15     -- 1 = instant snap, lower = softer pull (easier to look away)
+local LOCK_ACQUIRE_RADIUS = 150
+local LOCK_RELEASE_RADIUS = 200
+local LOCK_SWITCH_MARGIN = 10
+local LOCK_SMOOTHNESS = 0.15
 
--- Pre-made styles. Add your own by copying one of these tables.
--- bg = panel, text = labels, sub = watermark/version/scrollbar, button = small buttons,
--- off/on = switch and slider colors, knob = switch/slider circle,
--- outline = true draws an outline around the panel in the text color (optional)
 local THEMES = {
 	{
 		name = "Classic",
 		bg = Color3.fromRGB(0, 0, 0),
-		text = Color3.fromRGB(100, 100, 100),
+		card = Color3.fromRGB(14, 14, 14),
+		cardStroke = Color3.fromRGB(40, 40, 40),
+		text = Color3.fromRGB(105, 105, 105),
 		sub = Color3.fromRGB(62, 62, 62),
-		button = Color3.fromRGB(22, 22, 22),
+		button = Color3.fromRGB(24, 24, 24),
 		off = Color3.fromRGB(32, 32, 32),
-		on = Color3.fromRGB(95, 95, 95),
-		knob = Color3.fromRGB(160, 160, 160),
-		outline = true,
+		on = Color3.fromRGB(100, 100, 100),
+		knob = Color3.fromRGB(170, 170, 170),
+		outline = Color3.fromRGB(105, 105, 105),
+		shine = Color3.fromRGB(215, 215, 215),
 	},
 	{
 		name = "Obsidian",
-		bg = Color3.fromRGB(45, 45, 55),
+		bg = Color3.fromRGB(28, 28, 36),
+		card = Color3.fromRGB(38, 38, 50),
+		cardStroke = Color3.fromRGB(62, 62, 80),
 		text = Color3.fromRGB(255, 255, 255),
-		sub = Color3.fromRGB(120, 120, 135),
-		button = Color3.fromRGB(65, 65, 80),
-		off = Color3.fromRGB(80, 80, 95),
+		sub = Color3.fromRGB(120, 120, 138),
+		button = Color3.fromRGB(52, 52, 68),
+		off = Color3.fromRGB(70, 70, 88),
 		on = Color3.fromRGB(70, 200, 120),
 		knob = Color3.fromRGB(255, 255, 255),
+		outline = Color3.fromRGB(90, 90, 118),
+		shine = Color3.fromRGB(205, 210, 255),
 	},
 	{
 		name = "Bright",
-		bg = Color3.fromRGB(245, 245, 247),
-		text = Color3.fromRGB(20, 20, 25),
-		sub = Color3.fromRGB(150, 150, 160),
-		button = Color3.fromRGB(225, 225, 232),
-		off = Color3.fromRGB(200, 200, 210),
+		bg = Color3.fromRGB(246, 246, 249),
+		card = Color3.fromRGB(255, 255, 255),
+		cardStroke = Color3.fromRGB(222, 222, 232),
+		text = Color3.fromRGB(22, 22, 28),
+		sub = Color3.fromRGB(150, 150, 162),
+		button = Color3.fromRGB(236, 236, 243),
+		off = Color3.fromRGB(205, 205, 216),
 		on = Color3.fromRGB(60, 180, 100),
 		knob = Color3.fromRGB(255, 255, 255),
+		outline = Color3.fromRGB(200, 200, 214),
+		shine = Color3.fromRGB(105, 105, 135),
 	},
 	{
 		name = "Midnight",
-		bg = Color3.fromRGB(38, 28, 58),
+		bg = Color3.fromRGB(26, 18, 44),
+		card = Color3.fromRGB(38, 28, 62),
+		cardStroke = Color3.fromRGB(64, 48, 100),
 		text = Color3.fromRGB(235, 225, 255),
 		sub = Color3.fromRGB(120, 105, 150),
-		button = Color3.fromRGB(58, 46, 86),
-		off = Color3.fromRGB(78, 64, 110),
+		button = Color3.fromRGB(56, 44, 88),
+		off = Color3.fromRGB(72, 58, 106),
 		on = Color3.fromRGB(160, 110, 255),
 		knob = Color3.fromRGB(255, 255, 255),
+		outline = Color3.fromRGB(110, 80, 190),
+		shine = Color3.fromRGB(225, 195, 255),
 	},
 	{
 		name = "Ocean",
-		bg = Color3.fromRGB(18, 48, 72),
+		bg = Color3.fromRGB(10, 34, 54),
+		card = Color3.fromRGB(18, 50, 76),
+		cardStroke = Color3.fromRGB(34, 82, 118),
 		text = Color3.fromRGB(225, 245, 255),
 		sub = Color3.fromRGB(90, 130, 155),
-		button = Color3.fromRGB(30, 68, 98),
-		off = Color3.fromRGB(40, 78, 105),
+		button = Color3.fromRGB(28, 66, 98),
+		off = Color3.fromRGB(36, 76, 108),
 		on = Color3.fromRGB(40, 200, 220),
 		knob = Color3.fromRGB(255, 255, 255),
+		outline = Color3.fromRGB(40, 130, 190),
+		shine = Color3.fromRGB(175, 240, 255),
 	},
 	{
 		name = "Sunset",
-		bg = Color3.fromRGB(70, 30, 45),
+		bg = Color3.fromRGB(52, 22, 36),
+		card = Color3.fromRGB(72, 32, 50),
+		cardStroke = Color3.fromRGB(112, 52, 72),
 		text = Color3.fromRGB(255, 235, 225),
 		sub = Color3.fromRGB(170, 110, 110),
-		button = Color3.fromRGB(95, 45, 62),
-		off = Color3.fromRGB(110, 55, 70),
+		button = Color3.fromRGB(96, 44, 62),
+		off = Color3.fromRGB(108, 52, 70),
 		on = Color3.fromRGB(255, 140, 70),
 		knob = Color3.fromRGB(255, 255, 255),
+		outline = Color3.fromRGB(200, 90, 80),
+		shine = Color3.fromRGB(255, 215, 150),
 	},
 	{
 		name = "Forest",
-		bg = Color3.fromRGB(22, 44, 34),
+		bg = Color3.fromRGB(14, 32, 24),
+		card = Color3.fromRGB(22, 46, 36),
+		cardStroke = Color3.fromRGB(40, 80, 60),
 		text = Color3.fromRGB(225, 245, 230),
 		sub = Color3.fromRGB(100, 140, 115),
-		button = Color3.fromRGB(34, 64, 48),
-		off = Color3.fromRGB(48, 78, 62),
+		button = Color3.fromRGB(32, 62, 46),
+		off = Color3.fromRGB(44, 76, 60),
 		on = Color3.fromRGB(90, 220, 120),
 		knob = Color3.fromRGB(255, 255, 255),
+		outline = Color3.fromRGB(60, 150, 95),
+		shine = Color3.fromRGB(195, 255, 205),
 	},
 	{
 		name = "Sakura",
-		bg = Color3.fromRGB(255, 228, 236),
+		bg = Color3.fromRGB(255, 238, 243),
+		card = Color3.fromRGB(255, 249, 251),
+		cardStroke = Color3.fromRGB(245, 208, 222),
 		text = Color3.fromRGB(70, 30, 50),
 		sub = Color3.fromRGB(190, 140, 160),
-		button = Color3.fromRGB(248, 205, 218),
-		off = Color3.fromRGB(235, 190, 206),
+		button = Color3.fromRGB(250, 218, 229),
+		off = Color3.fromRGB(238, 196, 211),
 		on = Color3.fromRGB(235, 90, 140),
 		knob = Color3.fromRGB(255, 255, 255),
+		outline = Color3.fromRGB(240, 170, 195),
+		shine = Color3.fromRGB(210, 80, 130),
 	},
 }
 
--- Theme system: objects register a function that paints them with a theme
 local currentTheme = THEMES[1]
 for _, theme in ipairs(THEMES) do
 	if theme.name == DEFAULT_STYLE then
 		currentTheme = theme
 	end
 end
+
 local themeAppliers = {}
+local unlocked = false
 
 local function tweenColor(obj, prop, value, animate)
 	if animate then
@@ -196,9 +227,14 @@ local function applyTheme(theme)
 	end
 end
 
--- Fade lists:
---  contentItems = everything inside the panel once it is unlocked
---  shellItems   = the panel background/outline (and the key box while locked)
+local function addGradient(obj, top, bottom, rotation)
+	local gradient = Instance.new("UIGradient")
+	gradient.Color = ColorSequence.new(Color3.new(top, top, top), Color3.new(bottom, bottom, bottom))
+	gradient.Rotation = rotation or 90
+	gradient.Parent = obj
+	return gradient
+end
+
 local contentItems = {}
 local shellItems = {}
 
@@ -227,7 +263,6 @@ local function fadeList(items, target, animate)
 	end
 end
 
--- Input helpers
 local function isPressTypeInput(input)
 	return input.UserInputType == Enum.UserInputType.MouseButton1
 		or input.UserInputType == Enum.UserInputType.Touch
@@ -238,7 +273,6 @@ local function isMoveTypeInput(input)
 		or input.UserInputType == Enum.UserInputType.Touch
 end
 
--- Distance helpers (used by the ESP and Lines range limits)
 local function getOriginPosition()
 	local char = player.Character
 	local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -259,25 +293,40 @@ local function getDistanceTo(plr)
 	return (origin - root.Position).Magnitude
 end
 
--- ScreenGui container
+local function isInRange(plr)
+	local dist = getDistanceTo(plr)
+	return dist ~= nil and dist <= MAX_DISTANCE
+end
+
+local function project(camera, position)
+	local point = camera:WorldToViewportPoint(position)
+	return Vector2.new(point.X, point.Y), point.Z > 0
+end
+
+local function placeLine(line, from, to, thickness)
+	local delta = to - from
+	local mid = from + delta / 2
+	line.Size = UDim2.fromOffset(delta.Magnitude, thickness)
+	line.Position = UDim2.fromOffset(mid.X, mid.Y)
+	line.Rotation = math.deg(math.atan2(delta.Y, delta.X))
+end
+
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DraggableGui"
 screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 10
 screenGui.Parent = playerGui
 
--- Separate full-screen GUI for the lines
-local linesGui = Instance.new("ScreenGui")
-linesGui.Name = "LinesGui"
-linesGui.ResetOnSpawn = false
-linesGui.IgnoreGuiInset = true
-linesGui.DisplayOrder = 5
-linesGui.Parent = playerGui
+local overlayGui = Instance.new("ScreenGui")
+overlayGui.Name = "OverlayGui"
+overlayGui.ResetOnSpawn = false
+overlayGui.IgnoreGuiInset = true
+overlayGui.DisplayOrder = 5
+overlayGui.Parent = playerGui
 
--- Main panel (starts small for the key box, then grows to the full size once unlocked)
 local frame = Instance.new("Frame")
 frame.Name = "DraggableFrame"
-frame.Size = UDim2.new(0, PANEL_WIDTH, 0, GATE_HEIGHT)
+frame.Size = UDim2.new(0, GATE_WIDTH, 0, GATE_HEIGHT)
 frame.AnchorPoint = Vector2.new(0.5, 0.5)
 frame.Position = UDim2.new(0.5, 0, 0.5, 0)
 frame.BorderSizePixel = 0
@@ -285,23 +334,45 @@ frame.Active = true
 frame.Parent = screenGui
 registerShellFade(frame, { BackgroundTransparency = true })
 onTheme(function(t, a) tweenColor(frame, "BackgroundColor3", t.bg, a) end)
+addGradient(frame, 1, 0.8, 90)
 
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 16)
+corner.CornerRadius = UDim.new(0, 18)
 corner.Parent = frame
 
--- Panel outline (only visible for styles with outline = true, in the text color)
 local frameStroke = Instance.new("UIStroke")
-frameStroke.Thickness = 0
+frameStroke.Color = Color3.new(1, 1, 1)
+frameStroke.Thickness = OUTLINE_THICKNESS
 frameStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 frameStroke.Parent = frame
 registerShellFade(frameStroke, { Transparency = true })
-onTheme(function(t, a)
-	tweenColor(frameStroke, "Color", t.text, a)
-	tweenColor(frameStroke, "Thickness", t.outline and OUTLINE_THICKNESS or 0, a)
-end)
 
--- Header ("Universal #1")
+local outlineGradient = Instance.new("UIGradient")
+outlineGradient.Rotation = 25
+outlineGradient.Offset = Vector2.new(-1, 0)
+outlineGradient.Parent = frameStroke
+
+local function setOutline(base, shine)
+	outlineGradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, base),
+		ColorSequenceKeypoint.new(0.38, base),
+		ColorSequenceKeypoint.new(0.5, shine),
+		ColorSequenceKeypoint.new(0.62, base),
+		ColorSequenceKeypoint.new(1, base),
+	})
+end
+
+local function refreshOutline()
+	if unlocked then
+		setOutline(currentTheme.outline, currentTheme.shine)
+	else
+		setOutline(GATE_COLOR, GATE_SHINE)
+	end
+end
+
+onTheme(refreshOutline)
+TweenService:Create(outlineGradient, SHINE_TWEEN, { Offset = Vector2.new(1, 0) }):Play()
+
 local header = Instance.new("TextLabel")
 header.Name = "Header"
 header.Size = UDim2.new(1, -28, 0, 26)
@@ -314,8 +385,25 @@ header.TextXAlignment = Enum.TextXAlignment.Left
 header.Parent = frame
 registerFade(header, { TextTransparency = true })
 onTheme(function(t, a) tweenColor(header, "TextColor3", t.text, a) end)
+addGradient(header, 1, 0.68, 0)
 
--- Watermark (bottom left)
+local divider = Instance.new("Frame")
+divider.Name = "Divider"
+divider.Size = UDim2.new(1, -28, 0, 1)
+divider.Position = UDim2.new(0, 14, 0, 44)
+divider.BorderSizePixel = 0
+divider.Parent = frame
+registerFade(divider, { BackgroundTransparency = true })
+onTheme(function(t, a) tweenColor(divider, "BackgroundColor3", t.outline, a) end)
+
+local dividerGradient = Instance.new("UIGradient")
+dividerGradient.Transparency = NumberSequence.new({
+	NumberSequenceKeypoint.new(0, 1),
+	NumberSequenceKeypoint.new(0.5, 0),
+	NumberSequenceKeypoint.new(1, 1),
+})
+dividerGradient.Parent = divider
+
 local watermark = Instance.new("TextLabel")
 watermark.Name = "Watermark"
 watermark.Size = UDim2.new(0.5, -14, 0, 18)
@@ -330,7 +418,6 @@ watermark.Parent = frame
 registerFade(watermark, { TextTransparency = true })
 onTheme(function(t, a) tweenColor(watermark, "TextColor3", t.sub, a) end)
 
--- Update log / version number (bottom right, extra faint)
 local versionLabel = Instance.new("TextLabel")
 versionLabel.Name = "Version"
 versionLabel.Size = UDim2.new(0.5, -14, 0, 18)
@@ -345,12 +432,11 @@ versionLabel.Parent = frame
 registerFade(versionLabel, { TextTransparency = true })
 onTheme(function(t, a) tweenColor(versionLabel, "TextColor3", t.bg:Lerp(t.sub, 0.7), a) end)
 
--- Helper: creates a scrolling page that fills the area between header and bottom labels
 local function createScrollPage(name, padding)
 	local page = Instance.new("ScrollingFrame")
 	page.Name = name
-	page.Size = UDim2.new(1, -28, 1, -86)
-	page.Position = UDim2.new(0, 14, 0, 52)
+	page.Size = UDim2.new(1, -28, 1, -88)
+	page.Position = UDim2.new(0, 14, 0, 54)
 	page.BackgroundTransparency = 1
 	page.BorderSizePixel = 0
 	page.ScrollingDirection = Enum.ScrollingDirection.Y
@@ -362,7 +448,6 @@ local function createScrollPage(name, padding)
 	registerFade(page, { ScrollBarImageTransparency = true })
 	onTheme(function(t, a) tweenColor(page, "ScrollBarImageColor3", t.sub, a) end)
 
-	-- Small padding keeps strokes from being clipped and leaves room for the scrollbar
 	local pad = Instance.new("UIPadding")
 	pad.PaddingLeft = UDim.new(0, 4)
 	pad.PaddingRight = UDim.new(0, 10)
@@ -378,8 +463,7 @@ local function createScrollPage(name, padding)
 	return page
 end
 
--- Main page (option rows) and Styles page (hidden until the Styles button is pressed)
-local list = createScrollPage("OptionList", 8)
+local list = createScrollPage("OptionList", 10)
 local stylesPage = createScrollPage("StylesPage", 12)
 stylesPage.Visible = false
 
@@ -391,24 +475,64 @@ local function showPage(page)
 end
 
 local rowCount = 0
+local cardCount = 0
 
--- Helper: creates a row with a label and a round animated switch
-local function createToggleRow(name, callback)
+local function createCard()
+	cardCount += 1
+
+	local card = Instance.new("Frame")
+	card.Name = "Card" .. cardCount
+	card.Size = UDim2.new(1, 0, 0, 0)
+	card.AutomaticSize = Enum.AutomaticSize.Y
+	card.BorderSizePixel = 0
+	card.LayoutOrder = cardCount
+	card.Parent = list
+	registerFade(card, { BackgroundTransparency = true })
+	onTheme(function(t, a) tweenColor(card, "BackgroundColor3", t.card, a) end)
+	addGradient(card, 1, 0.86, 90)
+
+	local cardCorner = Instance.new("UICorner")
+	cardCorner.CornerRadius = UDim.new(0, 12)
+	cardCorner.Parent = card
+
+	local cardStroke = Instance.new("UIStroke")
+	cardStroke.Thickness = 1
+	cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	cardStroke.Parent = card
+	registerFade(cardStroke, { Transparency = true })
+	onTheme(function(t, a) tweenColor(cardStroke, "Color", t.cardStroke, a) end)
+
+	local cardPadding = Instance.new("UIPadding")
+	cardPadding.PaddingLeft = UDim.new(0, 12)
+	cardPadding.PaddingRight = UDim.new(0, 12)
+	cardPadding.PaddingTop = UDim.new(0, 8)
+	cardPadding.PaddingBottom = UDim.new(0, 8)
+	cardPadding.Parent = card
+
+	local cardLayout = Instance.new("UIListLayout")
+	cardLayout.Padding = UDim.new(0, 6)
+	cardLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	cardLayout.Parent = card
+
+	return card
+end
+
+local function createToggleRow(parent, name, callback)
 	rowCount += 1
 
 	local row = Instance.new("Frame")
 	row.Name = name .. "Row"
-	row.Size = UDim2.new(1, 0, 0, 36)
+	row.Size = UDim2.new(1, 0, 0, 34)
 	row.BackgroundTransparency = 1
 	row.LayoutOrder = rowCount
-	row.Parent = list
+	row.Parent = parent
 
 	local label = Instance.new("TextLabel")
 	label.Name = "Label"
-	label.Size = UDim2.new(1, -70, 1, 0)
+	label.Size = UDim2.new(1, -66, 1, 0)
 	label.BackgroundTransparency = 1
 	label.Text = name
-	label.TextSize = 18
+	label.TextSize = 17
 	label.Font = Enum.Font.GothamMedium
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = row
@@ -425,6 +549,7 @@ local function createToggleRow(name, callback)
 	switch.AutoButtonColor = false
 	switch.Parent = row
 	registerFade(switch, { BackgroundTransparency = true })
+	addGradient(switch, 1, 0.76, 90)
 
 	local switchCorner = Instance.new("UICorner")
 	switchCorner.CornerRadius = UDim.new(0.5, 0)
@@ -440,6 +565,7 @@ local function createToggleRow(name, callback)
 	knob.BorderSizePixel = 0
 	knob.Parent = switch
 	registerFade(knob, { BackgroundTransparency = true })
+	addGradient(knob, 1, 0.82, 90)
 
 	local knobCorner = Instance.new("UICorner")
 	knobCorner.CornerRadius = UDim.new(0.5, 0)
@@ -464,9 +590,7 @@ local function createToggleRow(name, callback)
 	end)
 end
 
--- Helper: creates a row with a label and a slider.
--- A small tick above the track marks the default value.
-local function createSliderRow(name, minValue, maxValue, defaultValue, callback)
+local function createSliderRow(parent, name, minValue, maxValue, defaultValue, callback)
 	rowCount += 1
 
 	local row = Instance.new("Frame")
@@ -474,14 +598,14 @@ local function createSliderRow(name, minValue, maxValue, defaultValue, callback)
 	row.Size = UDim2.new(1, 0, 0, 54)
 	row.BackgroundTransparency = 1
 	row.LayoutOrder = rowCount
-	row.Parent = list
+	row.Parent = parent
 
 	local label = Instance.new("TextLabel")
 	label.Name = "Label"
 	label.Size = UDim2.new(1, -60, 0, 22)
 	label.BackgroundTransparency = 1
 	label.Text = name
-	label.TextSize = 18
+	label.TextSize = 17
 	label.Font = Enum.Font.GothamMedium
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = row
@@ -501,7 +625,6 @@ local function createSliderRow(name, minValue, maxValue, defaultValue, callback)
 	registerFade(valueLabel, { TextTransparency = true })
 	onTheme(function(t, a) tweenColor(valueLabel, "TextColor3", t.text, a) end)
 
-	-- Slider area (inset so the knob never sticks out of the row)
 	local area = Instance.new("Frame")
 	area.Name = "SliderArea"
 	area.Size = UDim2.new(1, -18, 0, 30)
@@ -512,7 +635,6 @@ local function createSliderRow(name, minValue, maxValue, defaultValue, callback)
 	local range = maxValue - minValue
 	local defaultAlpha = (defaultValue - minValue) / range
 
-	-- Default marker (small line above the track)
 	local marker = Instance.new("Frame")
 	marker.Name = "DefaultMarker"
 	marker.Size = UDim2.new(0, 2, 0, 8)
@@ -527,7 +649,6 @@ local function createSliderRow(name, minValue, maxValue, defaultValue, callback)
 	markerCorner.CornerRadius = UDim.new(0.5, 0)
 	markerCorner.Parent = marker
 
-	-- Track
 	local track = Instance.new("Frame")
 	track.Name = "Track"
 	track.Size = UDim2.new(1, 0, 0, 8)
@@ -541,7 +662,6 @@ local function createSliderRow(name, minValue, maxValue, defaultValue, callback)
 	trackCorner.CornerRadius = UDim.new(0.5, 0)
 	trackCorner.Parent = track
 
-	-- Filled part of the track
 	local fill = Instance.new("Frame")
 	fill.Name = "Fill"
 	fill.Size = UDim2.new(defaultAlpha, 0, 1, 0)
@@ -549,12 +669,12 @@ local function createSliderRow(name, minValue, maxValue, defaultValue, callback)
 	fill.Parent = track
 	registerFade(fill, { BackgroundTransparency = true })
 	onTheme(function(t, a) tweenColor(fill, "BackgroundColor3", t.on, a) end)
+	addGradient(fill, 1, 0.76, 90)
 
 	local fillCorner = Instance.new("UICorner")
 	fillCorner.CornerRadius = UDim.new(0.5, 0)
 	fillCorner.Parent = fill
 
-	-- Knob
 	local knob = Instance.new("Frame")
 	knob.Name = "Knob"
 	knob.Size = UDim2.new(0, 18, 0, 18)
@@ -565,6 +685,7 @@ local function createSliderRow(name, minValue, maxValue, defaultValue, callback)
 	knob.Parent = area
 	registerFade(knob, { BackgroundTransparency = true })
 	onTheme(function(t, a) tweenColor(knob, "BackgroundColor3", t.knob, a) end)
+	addGradient(knob, 1, 0.82, 90)
 
 	local knobCorner = Instance.new("UICorner")
 	knobCorner.CornerRadius = UDim.new(0.5, 0)
@@ -577,8 +698,6 @@ local function createSliderRow(name, minValue, maxValue, defaultValue, callback)
 	registerFade(knobStroke, { Transparency = true })
 	onTheme(function(t, a) tweenColor(knobStroke, "Color", t.sub, a) end)
 
-	-- Invisible button over the slider that captures the mouse
-	-- (being a button also stops a press here from dragging the whole panel)
 	local hit = Instance.new("TextButton")
 	hit.Name = "Hit"
 	hit.Size = UDim2.new(1, 18, 1, 8)
@@ -590,7 +709,6 @@ local function createSliderRow(name, minValue, maxValue, defaultValue, callback)
 	hit.Parent = area
 
 	local function setValue(value)
-		-- Snap to the default when close, so it's easy to go back to normal
 		if math.abs(value - defaultValue) <= 1.5 then
 			value = defaultValue
 		end
@@ -630,16 +748,15 @@ local function createSliderRow(name, minValue, maxValue, defaultValue, callback)
 	end)
 end
 
--- Helper: creates a red warning label (symbol + text) under an option
-local function createWarningRow()
+local function createWarningRow(parent)
 	rowCount += 1
 
 	local row = Instance.new("Frame")
 	row.Name = "WarningRow" .. rowCount
-	row.Size = UDim2.new(1, 0, 0, 30)
+	row.Size = UDim2.new(1, 0, 0, 36)
 	row.BackgroundTransparency = 1
 	row.LayoutOrder = rowCount
-	row.Parent = list
+	row.Parent = parent
 
 	local icon = Instance.new("TextLabel")
 	icon.Name = "WarningIcon"
@@ -668,23 +785,22 @@ local function createWarningRow()
 	registerFade(text, { TextTransparency = true })
 end
 
--- Helper: creates a row with a label and a small button (used for "Styles")
-local function createButtonRow(name, buttonText, callback)
+local function createButtonRow(parent, name, buttonText, callback)
 	rowCount += 1
 
 	local row = Instance.new("Frame")
 	row.Name = name .. "Row"
-	row.Size = UDim2.new(1, 0, 0, 36)
+	row.Size = UDim2.new(1, 0, 0, 34)
 	row.BackgroundTransparency = 1
 	row.LayoutOrder = rowCount
-	row.Parent = list
+	row.Parent = parent
 
 	local label = Instance.new("TextLabel")
 	label.Name = "Label"
-	label.Size = UDim2.new(1, -70, 1, 0)
+	label.Size = UDim2.new(1, -66, 1, 0)
 	label.BackgroundTransparency = 1
 	label.Text = name
-	label.TextSize = 18
+	label.TextSize = 17
 	label.Font = Enum.Font.GothamMedium
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.Parent = row
@@ -703,20 +819,20 @@ local function createButtonRow(name, buttonText, callback)
 	button.AutoButtonColor = true
 	button.Parent = row
 	registerFade(button, { BackgroundTransparency = true, TextTransparency = true })
+	addGradient(button, 1, 0.8, 90)
 	onTheme(function(t, a)
 		tweenColor(button, "BackgroundColor3", t.button, a)
 		tweenColor(button, "TextColor3", t.text, a)
 	end)
 
 	local buttonCorner = Instance.new("UICorner")
-	buttonCorner.CornerRadius = UDim.new(0, 8)
+	buttonCorner.CornerRadius = UDim.new(0, 9)
 	buttonCorner.Parent = button
 
 	button.Activated:Connect(callback)
 end
 
--- Helper: creates a row of round color swatches (palette is optional)
-local function createColorRow(name, defaultColor, callback, palette)
+local function createColorRow(parent, name, defaultColor, callback, palette)
 	palette = palette or COLOR_PALETTE
 	rowCount += 1
 
@@ -725,7 +841,7 @@ local function createColorRow(name, defaultColor, callback, palette)
 	row.Size = UDim2.new(1, 0, 0, 28)
 	row.BackgroundTransparency = 1
 	row.LayoutOrder = rowCount
-	row.Parent = list
+	row.Parent = parent
 
 	local rowLayout = Instance.new("UIListLayout")
 	rowLayout.FillDirection = Enum.FillDirection.Horizontal
@@ -760,6 +876,7 @@ local function createColorRow(name, defaultColor, callback, palette)
 		swatch.LayoutOrder = i
 		swatch.Parent = row
 		registerFade(swatch, { BackgroundTransparency = true })
+		addGradient(swatch, 1, 0.8, 90)
 
 		local swatchCorner = Instance.new("UICorner")
 		swatchCorner.CornerRadius = UDim.new(0.5, 0)
@@ -782,11 +899,10 @@ local function createColorRow(name, defaultColor, callback, palette)
 	select(selectedIndex)
 end
 
--- ESP logic (highlights are only enabled for players within ESP_MAX_DISTANCE studs)
 local espEnabled = false
 local espColor = DEFAULT_ESP_COLOR
-local highlights = {}     -- [Player] = Highlight
-local characterConns = {} -- [Player] = RBXScriptConnection
+local highlights = {}
+local characterConns = {}
 local espRangeConn
 
 local function removeHighlight(plr)
@@ -802,8 +918,6 @@ local function addHighlight(plr)
 	local char = plr.Character
 	if not char then return end
 
-	local dist = getDistanceTo(plr)
-
 	local h = Instance.new("Highlight")
 	h.Name = "ESPHighlight"
 	h.FillColor = espColor
@@ -811,31 +925,14 @@ local function addHighlight(plr)
 	h.FillTransparency = 0.5
 	h.OutlineTransparency = 0
 	h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	h.Enabled = (dist ~= nil and dist <= ESP_MAX_DISTANCE)
+	h.Enabled = isInRange(plr)
 	h.Parent = char
 	highlights[plr] = h
 end
 
--- Turns highlights on/off depending on how far each player is
 local function updateESPRange()
 	for plr, h in pairs(highlights) do
-		local dist = getDistanceTo(plr)
-		h.Enabled = (dist ~= nil and dist <= ESP_MAX_DISTANCE)
-	end
-end
-
-local function trackPlayer(plr)
-	if plr == player then return end
-	if characterConns[plr] then return end
-
-	characterConns[plr] = plr.CharacterAdded:Connect(function()
-		if espEnabled then
-			addHighlight(plr)
-		end
-	end)
-
-	if espEnabled then
-		addHighlight(plr)
+		h.Enabled = isInRange(plr)
 	end
 end
 
@@ -846,11 +943,9 @@ local function setESP(enabled)
 		if not espRangeConn then
 			espRangeConn = RunService.Heartbeat:Connect(updateESPRange)
 		end
-	else
-		if espRangeConn then
-			espRangeConn:Disconnect()
-			espRangeConn = nil
-		end
+	elseif espRangeConn then
+		espRangeConn:Disconnect()
+		espRangeConn = nil
 	end
 
 	for _, plr in ipairs(Players:GetPlayers()) do
@@ -871,9 +966,347 @@ local function setESPColor(color)
 	end
 end
 
--- Lock logic (camera locks onto the head of the player nearest your crosshair)
+local namesEnabled = false
+local healthEnabled = false
+local namesColor = DEFAULT_NAMES_COLOR
+local healthColor = DEFAULT_HEALTH_COLOR
+local tags = {}
+local tagsConn
+
+local function createTagLabel(parent, order, height, textSize, color)
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 0, height)
+	label.BackgroundTransparency = 1
+	label.LayoutOrder = order
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = textSize
+	label.TextColor3 = color
+	label.TextStrokeColor3 = Color3.new(0, 0, 0)
+	label.TextStrokeTransparency = 0.35
+	label.Visible = false
+	label.Parent = parent
+	return label
+end
+
+local function createTag(plr)
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "Tag_" .. plr.UserId
+	gui.Size = UDim2.fromOffset(300, 100)
+	gui.StudsOffset = Vector3.new(0, 0.9, 0)
+	gui.AlwaysOnTop = true
+	gui.LightInfluence = 0
+	gui.ResetOnSpawn = false
+	gui.Enabled = false
+	gui.Parent = playerGui
+
+	local container = Instance.new("Frame")
+	container.Size = UDim2.new(1, 0, 0, 44)
+	container.AnchorPoint = Vector2.new(0.5, 1)
+	container.Position = UDim2.new(0.5, 0, 0.5, 0)
+	container.BackgroundTransparency = 1
+	container.Parent = gui
+
+	local containerLayout = Instance.new("UIListLayout")
+	containerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	containerLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	containerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	containerLayout.Padding = UDim.new(0, 2)
+	containerLayout.Parent = container
+
+	local nameLabel = createTagLabel(container, 1, 20, 15, namesColor)
+	nameLabel.Text = plr.DisplayName .. " | " .. plr.Name
+
+	local healthLabel = createTagLabel(container, 2, 18, 14, healthColor)
+
+	local tag = { gui = gui, name = nameLabel, health = healthLabel }
+	tags[plr] = tag
+	return tag
+end
+
+local function removeTag(plr)
+	local tag = tags[plr]
+	if tag then
+		tag.gui:Destroy()
+		tags[plr] = nil
+	end
+end
+
+local function updateTags()
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= player then
+			local tag = tags[plr] or createTag(plr)
+			local char = plr.Character
+			local head = char and char:FindFirstChild("Head")
+			local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+
+			if head and humanoid and humanoid.Health > 0 and isInRange(plr) then
+				tag.gui.Adornee = head
+				tag.name.Visible = namesEnabled
+				tag.health.Visible = healthEnabled
+				tag.health.Text = string.format("%d HP", math.ceil(humanoid.Health))
+				tag.gui.Enabled = true
+			else
+				tag.gui.Enabled = false
+			end
+		end
+	end
+end
+
+local function refreshTags()
+	if namesEnabled or healthEnabled then
+		if not tagsConn then
+			tagsConn = RunService.RenderStepped:Connect(updateTags)
+		end
+	else
+		if tagsConn then
+			tagsConn:Disconnect()
+			tagsConn = nil
+		end
+		for plr in pairs(tags) do
+			removeTag(plr)
+		end
+	end
+end
+
+local function setNames(enabled)
+	namesEnabled = enabled
+	refreshTags()
+end
+
+local function setHealth(enabled)
+	healthEnabled = enabled
+	refreshTags()
+end
+
+local function setNamesColor(color)
+	namesColor = color
+	for _, tag in pairs(tags) do
+		tag.name.TextColor3 = color
+	end
+end
+
+local function setHealthColor(color)
+	healthColor = color
+	for _, tag in pairs(tags) do
+		tag.health.TextColor3 = color
+	end
+end
+
+local boxColor = DEFAULT_BOX_COLOR
+local boxes = {}
+local boxesConn
+
+local function getBox(plr)
+	local box = boxes[plr]
+	if box then return box end
+
+	box = Instance.new("Frame")
+	box.Name = "Box_" .. plr.UserId
+	box.BackgroundTransparency = 1
+	box.BorderSizePixel = 0
+	box.Visible = false
+	box.Parent = overlayGui
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = boxColor
+	stroke.Thickness = BOX_THICKNESS
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Parent = box
+
+	boxes[plr] = box
+	return box
+end
+
+local function removeBox(plr)
+	local box = boxes[plr]
+	if box then
+		box:Destroy()
+		boxes[plr] = nil
+	end
+end
+
+local function updateBoxes()
+	local camera = workspace.CurrentCamera
+	if not camera then return end
+
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= player then
+			local box = getBox(plr)
+			local char = plr.Character
+			local root = char and char:FindFirstChild("HumanoidRootPart")
+			local head = char and char:FindFirstChild("Head")
+			local shown = false
+
+			if root and head and isInRange(plr) then
+				local top, topFront = project(camera, head.Position + Vector3.new(0, head.Size.Y / 2 + 0.1, 0))
+				local bottom, bottomFront = project(camera, root.Position - Vector3.new(0, 3, 0))
+				local height = bottom.Y - top.Y
+
+				if topFront and bottomFront and height > 2 then
+					local width = height * 0.6
+					box.Size = UDim2.fromOffset(width, height)
+					box.Position = UDim2.fromOffset((top.X + bottom.X) / 2 - width / 2, top.Y)
+					shown = true
+				end
+			end
+
+			box.Visible = shown
+		end
+	end
+end
+
+local function setBoxes(enabled)
+	if enabled then
+		if not boxesConn then
+			boxesConn = RunService.RenderStepped:Connect(updateBoxes)
+		end
+	else
+		if boxesConn then
+			boxesConn:Disconnect()
+			boxesConn = nil
+		end
+		for plr in pairs(boxes) do
+			removeBox(plr)
+		end
+	end
+end
+
+local function setBoxColor(color)
+	boxColor = color
+	for _, box in pairs(boxes) do
+		local stroke = box:FindFirstChildOfClass("UIStroke")
+		if stroke then
+			stroke.Color = color
+		end
+	end
+end
+
+local R15_BONES = {
+	{ "Head", "UpperTorso" },
+	{ "UpperTorso", "LowerTorso" },
+	{ "UpperTorso", "LeftUpperArm" },
+	{ "LeftUpperArm", "LeftLowerArm" },
+	{ "LeftLowerArm", "LeftHand" },
+	{ "UpperTorso", "RightUpperArm" },
+	{ "RightUpperArm", "RightLowerArm" },
+	{ "RightLowerArm", "RightHand" },
+	{ "LowerTorso", "LeftUpperLeg" },
+	{ "LeftUpperLeg", "LeftLowerLeg" },
+	{ "LeftLowerLeg", "LeftFoot" },
+	{ "LowerTorso", "RightUpperLeg" },
+	{ "RightUpperLeg", "RightLowerLeg" },
+	{ "RightLowerLeg", "RightFoot" },
+}
+
+local R6_BONES = {
+	{ "Head", "Torso" },
+	{ "Torso", "Left Arm" },
+	{ "Torso", "Right Arm" },
+	{ "Torso", "Left Leg" },
+	{ "Torso", "Right Leg" },
+}
+
+local skeletonColor = DEFAULT_SKELETON_COLOR
+local skeletons = {}
+local skeletonConn
+
+local function createBoneLine()
+	local line = Instance.new("Frame")
+	line.AnchorPoint = Vector2.new(0.5, 0.5)
+	line.BackgroundColor3 = skeletonColor
+	line.BorderSizePixel = 0
+	line.Visible = false
+	line.Parent = overlayGui
+	return line
+end
+
+local function removeSkeleton(plr)
+	local bones = skeletons[plr]
+	if bones then
+		for _, line in ipairs(bones) do
+			line:Destroy()
+		end
+		skeletons[plr] = nil
+	end
+end
+
+local function updateSkeletons()
+	local camera = workspace.CurrentCamera
+	if not camera then return end
+
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= player then
+			local bones = skeletons[plr]
+			if not bones then
+				bones = {}
+				skeletons[plr] = bones
+			end
+
+			local char = plr.Character
+			local layout = nil
+			if char and isInRange(plr) then
+				layout = char:FindFirstChild("UpperTorso") and R15_BONES or R6_BONES
+			end
+
+			local count = layout and #layout or 0
+
+			for i = 1, count do
+				local line = bones[i]
+				if not line then
+					line = createBoneLine()
+					bones[i] = line
+				end
+
+				local a = char:FindFirstChild(layout[i][1])
+				local b = char:FindFirstChild(layout[i][2])
+				local shown = false
+
+				if a and b then
+					local from, fromFront = project(camera, a.Position)
+					local to, toFront = project(camera, b.Position)
+					if fromFront and toFront then
+						placeLine(line, from, to, SKELETON_THICKNESS)
+						shown = true
+					end
+				end
+
+				line.Visible = shown
+			end
+
+			for i = count + 1, #bones do
+				bones[i].Visible = false
+			end
+		end
+	end
+end
+
+local function setSkeleton(enabled)
+	if enabled then
+		if not skeletonConn then
+			skeletonConn = RunService.RenderStepped:Connect(updateSkeletons)
+		end
+	else
+		if skeletonConn then
+			skeletonConn:Disconnect()
+			skeletonConn = nil
+		end
+		for plr in pairs(skeletons) do
+			removeSkeleton(plr)
+		end
+	end
+end
+
+local function setSkeletonColor(color)
+	skeletonColor = color
+	for _, bones in pairs(skeletons) do
+		for _, line in ipairs(bones) do
+			line.BackgroundColor3 = color
+		end
+	end
+end
+
 local lockEnabled = false
-local lockedTarget = nil -- Player currently locked onto (also read by Lines)
+local lockedTarget = nil
 local lockedLineColor = DEFAULT_LOCKED_COLOR
 local LOCK_BIND_NAME = "LockOnHead"
 
@@ -898,24 +1331,22 @@ local function updateLock()
 	local camera = workspace.CurrentCamera
 	if not camera then return end
 
-	-- Distance of the current target from the center (nil if it should be dropped)
 	local currentDist = nil
 	if lockedTarget then
 		local head = getHead(lockedTarget)
-		currentDist = head and distanceFromCenter(camera, head.Position)
+		currentDist = head and isInRange(lockedTarget) and distanceFromCenter(camera, head.Position)
 		if not currentDist or currentDist > LOCK_RELEASE_RADIUS then
 			lockedTarget = nil
 			currentDist = nil
 		end
 	end
 
-	-- Find whoever is closest to the center of the screen right now
 	local bestPlayer = nil
 	local bestDist = LOCK_ACQUIRE_RADIUS
 	for _, plr in ipairs(Players:GetPlayers()) do
 		if plr ~= player then
 			local head = getHead(plr)
-			if head then
+			if head and isInRange(plr) then
 				local dist = distanceFromCenter(camera, head.Position)
 				if dist and dist < bestDist then
 					bestDist = dist
@@ -925,14 +1356,12 @@ local function updateLock()
 		end
 	end
 
-	-- Switch if there's no target, or someone else is clearly closer to center
 	if bestPlayer and bestPlayer ~= lockedTarget then
 		if not lockedTarget or bestDist + LOCK_SWITCH_MARGIN < currentDist then
 			lockedTarget = bestPlayer
 		end
 	end
 
-	-- Aim at the locked target's head
 	if lockedTarget then
 		local head = getHead(lockedTarget)
 		if head then
@@ -956,10 +1385,9 @@ local function setLockedLineColor(color)
 	lockedLineColor = color
 end
 
--- Lines logic (bottom middle of the screen -> players within LINES_MAX_DISTANCE studs)
 local linesEnabled = false
 local lineColor = DEFAULT_LINE_COLOR
-local lines = {} -- [Player] = Frame
+local lines = {}
 local linesConn
 
 local function getLine(plr)
@@ -967,12 +1395,12 @@ local function getLine(plr)
 	if line then return line end
 
 	line = Instance.new("Frame")
-	line.Name = "Line_" .. plr.Name
+	line.Name = "Line_" .. plr.UserId
 	line.AnchorPoint = Vector2.new(0.5, 0.5)
 	line.BackgroundColor3 = lineColor
 	line.BorderSizePixel = 0
 	line.Visible = false
-	line.Parent = linesGui
+	line.Parent = overlayGui
 	lines[plr] = line
 	return line
 end
@@ -989,7 +1417,6 @@ local function updateLines()
 	local camera = workspace.CurrentCamera
 	if not camera then return end
 
-	-- Every line starts from the bottom middle of the screen
 	local viewport = camera.ViewportSize
 	local origin = Vector2.new(viewport.X / 2, viewport.Y)
 
@@ -998,26 +1425,18 @@ local function updateLines()
 			local line = getLine(plr)
 			local char = plr.Character
 			local part = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head"))
-			local dist = getDistanceTo(plr)
+			local shown = false
 
-			if part and dist and dist <= LINES_MAX_DISTANCE then
-				local pos, onScreen = camera:WorldToViewportPoint(part.Position)
-				if onScreen then
-					local target = Vector2.new(pos.X, pos.Y)
-					local delta = target - origin
-					local mid = origin + delta / 2
-
-					line.Size = UDim2.fromOffset(delta.Magnitude, LINE_THICKNESS)
-					line.Position = UDim2.fromOffset(mid.X, mid.Y)
-					line.Rotation = math.deg(math.atan2(delta.Y, delta.X))
+			if part and isInRange(plr) then
+				local target, front = project(camera, part.Position)
+				if front then
+					placeLine(line, origin, target, LINE_THICKNESS)
 					line.BackgroundColor3 = (plr == lockedTarget) and lockedLineColor or lineColor
-					line.Visible = true
-				else
-					line.Visible = false
+					shown = true
 				end
-			else
-				line.Visible = false
 			end
+
+			line.Visible = shown
 		end
 	end
 end
@@ -1044,9 +1463,8 @@ local function setLineColor(color)
 	lineColor = color
 end
 
--- Speed logic (sets your character's WalkSpeed from the slider)
 local speedValue = DEFAULT_SPEED
-local speedActive = false -- only enforce the speed while the slider is off the default
+local speedActive = false
 
 local function getHumanoid()
 	local char = player.Character
@@ -1063,7 +1481,6 @@ local function setSpeed(value)
 	end
 end
 
--- Re-applies the speed after respawns, or if the game resets WalkSpeed
 RunService.Heartbeat:Connect(function()
 	if not speedActive then return end
 	local humanoid = getHumanoid()
@@ -1072,7 +1489,21 @@ RunService.Heartbeat:Connect(function()
 	end
 end)
 
--- Player join/leave handling
+local function trackPlayer(plr)
+	if plr == player then return end
+	if characterConns[plr] then return end
+
+	characterConns[plr] = plr.CharacterAdded:Connect(function()
+		if espEnabled then
+			addHighlight(plr)
+		end
+	end)
+
+	if espEnabled then
+		addHighlight(plr)
+	end
+end
+
 local function untrackPlayer(plr)
 	if characterConns[plr] then
 		characterConns[plr]:Disconnect()
@@ -1083,6 +1514,9 @@ local function untrackPlayer(plr)
 	end
 	removeHighlight(plr)
 	removeLine(plr)
+	removeBox(plr)
+	removeSkeleton(plr)
+	removeTag(plr)
 end
 
 for _, plr in ipairs(Players:GetPlayers()) do
@@ -1091,28 +1525,45 @@ end
 Players.PlayerAdded:Connect(trackPlayer)
 Players.PlayerRemoving:Connect(untrackPlayer)
 
--- Options (main page)
-createToggleRow("ESP", setESP)
-createColorRow("ESP", DEFAULT_ESP_COLOR, setESPColor)
-createToggleRow("Lines", setLines)
-createColorRow("Lines", DEFAULT_LINE_COLOR, setLineColor)
-createToggleRow("Lock", setLock)
-createWarningRow()
-createColorRow("Lock", DEFAULT_LOCKED_COLOR, setLockedLineColor, LOCK_PALETTE)
-createSliderRow("Speed", MIN_SPEED, MAX_SPEED, DEFAULT_SPEED, setSpeed)
-createWarningRow()
-createButtonRow("Styles", "›", function()
+local card = createCard()
+createToggleRow(card, "ESP", setESP)
+createColorRow(card, "ESP", DEFAULT_ESP_COLOR, setESPColor)
+
+card = createCard()
+createToggleRow(card, "Names", setNames)
+createColorRow(card, "Names", DEFAULT_NAMES_COLOR, setNamesColor)
+
+card = createCard()
+createToggleRow(card, "Health", setHealth)
+createColorRow(card, "Health", DEFAULT_HEALTH_COLOR, setHealthColor, ACCENT_PALETTE)
+
+card = createCard()
+createToggleRow(card, "Boxes ESP", setBoxes)
+createColorRow(card, "Boxes", DEFAULT_BOX_COLOR, setBoxColor)
+
+card = createCard()
+createToggleRow(card, "Skeleton ESP", setSkeleton)
+createColorRow(card, "Skeleton", DEFAULT_SKELETON_COLOR, setSkeletonColor)
+
+card = createCard()
+createToggleRow(card, "Lines", setLines)
+createColorRow(card, "Lines", DEFAULT_LINE_COLOR, setLineColor)
+
+card = createCard()
+createToggleRow(card, "Lock", setLock)
+createWarningRow(card)
+createColorRow(card, "Lock", DEFAULT_LOCKED_COLOR, setLockedLineColor, ACCENT_PALETTE)
+
+card = createCard()
+createSliderRow(card, "Speed", MIN_SPEED, MAX_SPEED, DEFAULT_SPEED, setSpeed)
+createWarningRow(card)
+
+card = createCard()
+createButtonRow(card, "Styles", "›", function()
 	showPage("styles")
 end)
--- Add more like this (the list scrolls, so you can add as many as you want):
--- createToggleRow("Another Option", function(enabled)
---     print("Another Option:", enabled)
--- end)
--- Add createWarningRow() right after any option that should show the warning.
 
--- Styles page contents
 do
-	-- Back button
 	local back = Instance.new("TextButton")
 	back.Name = "Back"
 	back.Size = UDim2.new(0, 84, 0, 28)
@@ -1124,20 +1575,20 @@ do
 	back.LayoutOrder = 1
 	back.Parent = stylesPage
 	registerFade(back, { BackgroundTransparency = true, TextTransparency = true })
+	addGradient(back, 1, 0.8, 90)
 	onTheme(function(t, a)
 		tweenColor(back, "BackgroundColor3", t.button, a)
 		tweenColor(back, "TextColor3", t.text, a)
 	end)
 
 	local backCorner = Instance.new("UICorner")
-	backCorner.CornerRadius = UDim.new(0, 8)
+	backCorner.CornerRadius = UDim.new(0, 9)
 	backCorner.Parent = back
 
 	back.Activated:Connect(function()
 		showPage("main")
 	end)
 
-	-- Grid of style buttons (2 columns)
 	local rows = math.ceil(#THEMES / 2)
 
 	local grid = Instance.new("Frame")
@@ -1153,11 +1604,13 @@ do
 	gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	gridLayout.Parent = grid
 
-	local strokes = {}
+	local styleStrokes = {}
 
 	local function selectStyle(index)
-		for i, stroke in ipairs(strokes) do
-			stroke.Thickness = (i == index) and 3 or 0
+		for i, stroke in ipairs(styleStrokes) do
+			local selected = (i == index)
+			stroke.Thickness = selected and 3 or 1
+			stroke.Color = selected and THEMES[i].on or THEMES[i].outline
 		end
 	end
 
@@ -1174,21 +1627,18 @@ do
 		button.LayoutOrder = i
 		button.Parent = grid
 		registerFade(button, { BackgroundTransparency = true, TextTransparency = true })
+		addGradient(button, 1, 0.8, 90)
 
 		local buttonCorner = Instance.new("UICorner")
 		buttonCorner.CornerRadius = UDim.new(0, 10)
 		buttonCorner.Parent = button
 
-		-- Ring that marks the selected style (uses that style's accent color)
 		local stroke = Instance.new("UIStroke")
-		stroke.Color = theme.on
-		stroke.Thickness = (theme == currentTheme) and 3 or 0
 		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		stroke.Parent = button
 		registerFade(stroke, { Transparency = true })
-		strokes[i] = stroke
+		styleStrokes[i] = stroke
 
-		-- Small preview dot in the style's accent color
 		local dot = Instance.new("Frame")
 		dot.Size = UDim2.new(0, 8, 0, 8)
 		dot.AnchorPoint = Vector2.new(1, 0.5)
@@ -1207,13 +1657,19 @@ do
 			applyTheme(theme)
 		end)
 	end
+
+	for i, theme in ipairs(THEMES) do
+		if theme == currentTheme then
+			selectStyle(i)
+		end
+	end
 end
 
--- Dragging logic
 local dragging = false
 local dragStart, startPos
 
 frame.InputBegan:Connect(function(input)
+	if not unlocked then return end
 	if isPressTypeInput(input) then
 		dragging = true
 		dragStart = input.Position
@@ -1239,10 +1695,8 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
--- Toggle logic (fade in/out)
 local isOpen = false
 local toggleId = 0
-local unlocked = false -- becomes true once the correct key has been entered
 
 local function applyState(open, animate)
 	isOpen = open
@@ -1281,11 +1735,9 @@ UserInputService.InputBegan:Connect(function(input)
 	end
 end)
 
--- Key box on the panel: while locked, the panel is small and shows only a text box.
--- Type the key and press Enter. The full GUI is revealed once the key is correct.
 local function createKeyGate()
-	-- Hide all the normal content while locked
 	header.Visible = false
+	divider.Visible = false
 	watermark.Visible = false
 	versionLabel.Visible = false
 	list.Visible = false
@@ -1294,8 +1746,8 @@ local function createKeyGate()
 	local box = Instance.new("TextBox")
 	box.Name = "KeyBox"
 	box.Size = UDim2.new(1, -48, 0, 44)
-	box.AnchorPoint = Vector2.new(0.5, 0.5)
-	box.Position = UDim2.new(0.5, 0, 0.5, 0)
+	box.AnchorPoint = Vector2.new(0.5, 0)
+	box.Position = UDim2.new(0.5, 0, 0, 34)
 	box.BackgroundColor3 = currentTheme.button
 	box.BorderSizePixel = 0
 	box.Text = ""
@@ -1306,23 +1758,40 @@ local function createKeyGate()
 	box.TextSize = 18
 	box.ClearTextOnFocus = false
 	box.Parent = frame
+	addGradient(box, 1, 0.8, 90)
 
 	local boxCorner = Instance.new("UICorner")
 	boxCorner.CornerRadius = UDim.new(0, 12)
 	boxCorner.Parent = box
 
 	local boxStroke = Instance.new("UIStroke")
-	boxStroke.Color = currentTheme.text
-	boxStroke.Thickness = 2
+	boxStroke.Color = currentTheme.cardStroke
+	boxStroke.Thickness = 1
 	boxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	boxStroke.Parent = box
 
-	-- Shown only after a wrong key
+	local linkHex = "#" .. currentTheme.knob:ToHex()
+
+	local linkLabel = Instance.new("TextLabel")
+	linkLabel.Name = "KeyLink"
+	linkLabel.Size = UDim2.new(1, -48, 0, 34)
+	linkLabel.AnchorPoint = Vector2.new(0.5, 0)
+	linkLabel.Position = UDim2.new(0.5, 0, 0, 86)
+	linkLabel.BackgroundTransparency = 1
+	linkLabel.RichText = true
+	linkLabel.Text = 'Get the script-specific key at <font color="' .. linkHex .. '"><b><u>' .. DISCORD_TEXT .. "</u></b></font>"
+	linkLabel.TextColor3 = currentTheme.text
+	linkLabel.TextSize = 13
+	linkLabel.Font = Enum.Font.GothamMedium
+	linkLabel.TextWrapped = true
+	linkLabel.TextYAlignment = Enum.TextYAlignment.Top
+	linkLabel.Parent = frame
+
 	local errorLabel = Instance.new("TextLabel")
 	errorLabel.Name = "Error"
-	errorLabel.Size = UDim2.new(1, -28, 0, 20)
+	errorLabel.Size = UDim2.new(1, -48, 0, 20)
 	errorLabel.AnchorPoint = Vector2.new(0.5, 0)
-	errorLabel.Position = UDim2.new(0.5, 0, 0.5, 32)
+	errorLabel.Position = UDim2.new(0.5, 0, 0, 128)
 	errorLabel.BackgroundTransparency = 1
 	errorLabel.Text = ""
 	errorLabel.TextColor3 = WARNING_COLOR
@@ -1330,10 +1799,10 @@ local function createKeyGate()
 	errorLabel.Font = Enum.Font.GothamBold
 	errorLabel.Parent = frame
 
-	-- These fade in/out with the panel while the key box is showing
 	local gateEntries = {
 		{ box, { BackgroundTransparency = true, TextTransparency = true } },
 		{ boxStroke, { Transparency = true } },
+		{ linkLabel, { TextTransparency = true } },
 		{ errorLabel, { TextTransparency = true } },
 	}
 	for _, entry in ipairs(gateEntries) do
@@ -1341,46 +1810,63 @@ local function createKeyGate()
 	end
 
 	local finished = false
+	local flashId = 0
+
+	local function openGui()
+		TweenService:Create(box, TWEEN_INFO, { BackgroundTransparency = 1, TextTransparency = 1 }):Play()
+		TweenService:Create(boxStroke, TWEEN_INFO, { Transparency = 1 }):Play()
+		TweenService:Create(linkLabel, TWEEN_INFO, { TextTransparency = 1 }):Play()
+
+		unlocked = true
+		refreshOutline()
+		header.Visible = true
+		divider.Visible = true
+		watermark.Visible = true
+		versionLabel.Visible = true
+		showPage("main")
+
+		TweenService:Create(frame, EXPAND_TWEEN, {
+			Size = UDim2.new(0, PANEL_WIDTH, 0, PANEL_HEIGHT),
+		}):Play()
+		fadeList(contentItems, isOpen and 0 or 1, true)
+
+		task.delay(TWEEN_INFO.Time + 0.05, function()
+			for _, entry in ipairs(gateEntries) do
+				local index = table.find(shellItems, entry)
+				if index then
+					table.remove(shellItems, index)
+				end
+			end
+			box:Destroy()
+			linkLabel:Destroy()
+			errorLabel:Destroy()
+		end)
+	end
 
 	box.FocusLost:Connect(function(enterPressed)
 		if finished or not enterPressed then return end
 
 		local entered = box.Text:match("^%s*(.-)%s*$")
+		flashId += 1
 
 		if entered == ACCESS_KEY then
 			finished = true
 			errorLabel.Text = ""
-
-			-- Fade the key box away
-			TweenService:Create(box, TWEEN_INFO, { BackgroundTransparency = 1, TextTransparency = 1 }):Play()
-			TweenService:Create(boxStroke, TWEEN_INFO, { Transparency = 1 }):Play()
-
-			-- Reveal the full GUI: the panel grows and the content fades in
-			unlocked = true
-			header.Visible = true
-			watermark.Visible = true
-			versionLabel.Visible = true
-			showPage("main")
-			TweenService:Create(frame, EXPAND_TWEEN, {
-				Size = UDim2.new(0, PANEL_WIDTH, 0, PANEL_HEIGHT),
-			}):Play()
-			fadeList(contentItems, 0, true)
-
-			-- Clean up the key box
-			task.delay(TWEEN_INFO.Time + 0.05, function()
-				for _, entry in ipairs(gateEntries) do
-					local index = table.find(shellItems, entry)
-					if index then
-						table.remove(shellItems, index)
-					end
-				end
-				box:Destroy()
-				errorLabel:Destroy()
-			end)
+			box.TextEditable = false
+			setOutline(SUCCESS_COLOR, SUCCESS_SHINE)
+			task.delay(1, openGui)
 		else
-			-- Wrong key: say so, clear the box and let them try again
+			local myId = flashId
 			errorLabel.Text = "Incorrect key. Access denied."
 			box.Text = ""
+			setOutline(FLASH_COLOR, FLASH_COLOR)
+
+			task.delay(1, function()
+				if flashId == myId and not finished then
+					refreshOutline()
+				end
+			end)
+
 			task.defer(function()
 				if box.Parent then
 					box:CaptureFocus()
@@ -1398,7 +1884,6 @@ end
 
 createKeyGate()
 
--- Start with the content invisible, then fade the small key panel in
 fadeList(contentItems, 1, false)
 applyState(false, false)
 applyState(true, true)
