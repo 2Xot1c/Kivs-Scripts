@@ -11,6 +11,7 @@ local TWEEN_INFO = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirecti
 local SWITCH_TWEEN = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local THEME_TWEEN = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local EXPAND_TWEEN = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local HOVER_TWEEN = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local SHINE_TWEEN = TweenInfo.new(2.6, Enum.EasingStyle.Linear, Enum.EasingDirection.In, -1)
 
 local ACCESS_KEY = "KivsScriptsUni1"
@@ -19,7 +20,7 @@ local DEFAULT_STYLE = "Classic"
 
 local HEADER_TEXT = "Universal #1"
 local WATERMARK_TEXT = "By Kivs"
-local VERSION_TEXT = "1.1.0"
+local VERSION_TEXT = "1.2.0"
 
 local WARNING_ICON = "⚠"
 local WARNING_TEXT = "WARNING - THIS OPTION HAS HIGH RISK OF A BAN. USE AT YOUR OWN RISK."
@@ -36,6 +37,10 @@ local PANEL_HEIGHT = 340
 local GATE_WIDTH = 340
 local GATE_HEIGHT = 180
 local OUTLINE_THICKNESS = 2
+
+local CUSTOM_SHINE_SLOW = 70
+local CUSTOM_SHINE_FAST = 620
+local CUSTOM_HOVER_SCALE = 1.1
 
 local MAX_DISTANCE = 200
 
@@ -197,6 +202,19 @@ local THEMES = {
 	},
 }
 
+local CUSTOM_FIELDS = {
+	{ label = "Background", key = "bg" },
+	{ label = "Gradient 2", key = "bg2" },
+	{ label = "Cards", key = "card" },
+	{ label = "Letters", key = "text" },
+	{ label = "Accent", key = "on" },
+	{ label = "Buttons", key = "button" },
+	{ label = "Outline", key = "outline" },
+	{ label = "Shine", key = "shine" },
+	{ label = "Knob", key = "knob" },
+	{ label = "Switch Off", key = "off" },
+}
+
 local currentTheme = THEMES[1]
 for _, theme in ipairs(THEMES) do
 	if theme.name == DEFAULT_STYLE then
@@ -207,6 +225,39 @@ end
 local themeAppliers = {}
 local unlocked = false
 
+local function panelColors(theme)
+	if theme.custom then
+		return theme.bg, theme.gradient and theme.bg2 or theme.bg
+	end
+	return theme.bg, theme.bg:Lerp(Color3.new(0, 0, 0), 0.2)
+end
+
+local CUSTOM_THEME = { name = "Custom", custom = true, gradient = true }
+local customSeeded = false
+
+local function refreshCustomDerived()
+	CUSTOM_THEME.sub = CUSTOM_THEME.text:Lerp(CUSTOM_THEME.bg, 0.5)
+	CUSTOM_THEME.cardStroke = CUSTOM_THEME.card:Lerp(CUSTOM_THEME.text, 0.2)
+end
+
+local function seedCustom(theme)
+	local _, bottom = panelColors(theme)
+	CUSTOM_THEME.bg = theme.bg
+	CUSTOM_THEME.bg2 = bottom
+	CUSTOM_THEME.card = theme.card
+	CUSTOM_THEME.text = theme.text
+	CUSTOM_THEME.on = theme.on
+	CUSTOM_THEME.button = theme.button
+	CUSTOM_THEME.off = theme.off
+	CUSTOM_THEME.knob = theme.knob
+	CUSTOM_THEME.outline = theme.outline
+	CUSTOM_THEME.shine = theme.shine
+	CUSTOM_THEME.gradient = true
+	refreshCustomDerived()
+end
+
+seedCustom(THEMES[2])
+
 local function tweenColor(obj, prop, value, animate)
 	if animate then
 		TweenService:Create(obj, THEME_TWEEN, { [prop] = value }):Play()
@@ -215,15 +266,45 @@ local function tweenColor(obj, prop, value, animate)
 	end
 end
 
+local function tweenGradientColors(gradient, state, top, bottom, animate)
+	if state.connection then
+		state.connection:Disconnect()
+		state.connection = nil
+	end
+
+	if not animate or not state.top then
+		state.top = top
+		state.bottom = bottom
+		gradient.Color = ColorSequence.new(top, bottom)
+		return
+	end
+
+	local fromTop = state.top
+	local fromBottom = state.bottom
+	local value = Instance.new("NumberValue")
+
+	state.connection = value.Changed:Connect(function(alpha)
+		state.top = fromTop:Lerp(top, alpha)
+		state.bottom = fromBottom:Lerp(bottom, alpha)
+		gradient.Color = ColorSequence.new(state.top, state.bottom)
+	end)
+
+	local tween = TweenService:Create(value, THEME_TWEEN, { Value = 1 })
+	tween.Completed:Connect(function()
+		value:Destroy()
+	end)
+	tween:Play()
+end
+
 local function onTheme(fn)
 	table.insert(themeAppliers, fn)
 	fn(currentTheme, false)
 end
 
-local function applyTheme(theme)
+local function applyTheme(theme, instant)
 	currentTheme = theme
 	for _, fn in ipairs(themeAppliers) do
-		fn(theme, true)
+		fn(theme, not instant)
 	end
 end
 
@@ -233,6 +314,16 @@ local function addGradient(obj, top, bottom, rotation)
 	gradient.Rotation = rotation or 90
 	gradient.Parent = obj
 	return gradient
+end
+
+local function shineSequence(base, shine)
+	return ColorSequence.new({
+		ColorSequenceKeypoint.new(0, base),
+		ColorSequenceKeypoint.new(0.38, base),
+		ColorSequenceKeypoint.new(0.5, shine),
+		ColorSequenceKeypoint.new(0.62, base),
+		ColorSequenceKeypoint.new(1, base),
+	})
 end
 
 local contentItems = {}
@@ -329,12 +420,21 @@ frame.Name = "DraggableFrame"
 frame.Size = UDim2.new(0, GATE_WIDTH, 0, GATE_HEIGHT)
 frame.AnchorPoint = Vector2.new(0.5, 0.5)
 frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+frame.BackgroundColor3 = Color3.new(1, 1, 1)
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Parent = screenGui
 registerShellFade(frame, { BackgroundTransparency = true })
-onTheme(function(t, a) tweenColor(frame, "BackgroundColor3", t.bg, a) end)
-addGradient(frame, 1, 0.8, 90)
+
+local frameGradient = Instance.new("UIGradient")
+frameGradient.Rotation = 90
+frameGradient.Parent = frame
+
+local frameGradientState = {}
+onTheme(function(t, a)
+	local top, bottom = panelColors(t)
+	tweenGradientColors(frameGradient, frameGradientState, top, bottom, a)
+end)
 
 local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 18)
@@ -353,13 +453,7 @@ outlineGradient.Offset = Vector2.new(-1, 0)
 outlineGradient.Parent = frameStroke
 
 local function setOutline(base, shine)
-	outlineGradient.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, base),
-		ColorSequenceKeypoint.new(0.38, base),
-		ColorSequenceKeypoint.new(0.5, shine),
-		ColorSequenceKeypoint.new(0.62, base),
-		ColorSequenceKeypoint.new(1, base),
-	})
+	outlineGradient.Color = shineSequence(base, shine)
 end
 
 local function refreshOutline()
@@ -465,19 +559,23 @@ end
 
 local list = createScrollPage("OptionList", 10)
 local stylesPage = createScrollPage("StylesPage", 12)
+local customPage = createScrollPage("CustomPage", 10)
 stylesPage.Visible = false
+customPage.Visible = false
 
 local function showPage(page)
 	list.Visible = (page == "main")
 	stylesPage.Visible = (page == "styles")
+	customPage.Visible = (page == "custom")
 	list.CanvasPosition = Vector2.new(0, 0)
 	stylesPage.CanvasPosition = Vector2.new(0, 0)
+	customPage.CanvasPosition = Vector2.new(0, 0)
 end
 
 local rowCount = 0
 local cardCount = 0
 
-local function createCard()
+local function createCard(parent)
 	cardCount += 1
 
 	local card = Instance.new("Frame")
@@ -486,7 +584,7 @@ local function createCard()
 	card.AutomaticSize = Enum.AutomaticSize.Y
 	card.BorderSizePixel = 0
 	card.LayoutOrder = cardCount
-	card.Parent = list
+	card.Parent = parent
 	registerFade(card, { BackgroundTransparency = true })
 	onTheme(function(t, a) tweenColor(card, "BackgroundColor3", t.card, a) end)
 	addGradient(card, 1, 0.86, 90)
@@ -517,7 +615,7 @@ local function createCard()
 	return card
 end
 
-local function createToggleRow(parent, name, callback)
+local function createToggleRow(parent, name, callback, startOn)
 	rowCount += 1
 
 	local row = Instance.new("Frame")
@@ -558,10 +656,12 @@ local function createToggleRow(parent, name, callback)
 	local KNOB_OFF_POS = UDim2.new(0, 3, 0.5, -11)
 	local KNOB_ON_POS = UDim2.new(1, -25, 0.5, -11)
 
+	local state = startOn or false
+
 	local knob = Instance.new("Frame")
 	knob.Name = "Knob"
 	knob.Size = UDim2.new(0, 22, 0, 22)
-	knob.Position = KNOB_OFF_POS
+	knob.Position = state and KNOB_ON_POS or KNOB_OFF_POS
 	knob.BorderSizePixel = 0
 	knob.Parent = switch
 	registerFade(knob, { BackgroundTransparency = true })
@@ -571,26 +671,33 @@ local function createToggleRow(parent, name, callback)
 	knobCorner.CornerRadius = UDim.new(0.5, 0)
 	knobCorner.Parent = knob
 
-	local state = false
-
 	onTheme(function(t, a)
 		tweenColor(switch, "BackgroundColor3", state and t.on or t.off, a)
 		tweenColor(knob, "BackgroundColor3", t.knob, a)
 	end)
 
-	switch.Activated:Connect(function()
-		state = not state
+	local function showState()
 		TweenService:Create(knob, SWITCH_TWEEN, {
 			Position = state and KNOB_ON_POS or KNOB_OFF_POS,
 		}):Play()
 		TweenService:Create(switch, SWITCH_TWEEN, {
 			BackgroundColor3 = state and currentTheme.on or currentTheme.off,
 		}):Play()
+	end
+
+	switch.Activated:Connect(function()
+		state = not state
+		showState()
 		callback(state)
 	end)
+
+	return function(value)
+		state = value
+		showState()
+	end
 end
 
-local function createSliderRow(parent, name, minValue, maxValue, defaultValue, callback)
+local function createSliderRow(parent, name, minValue, maxValue, defaultValue, callback, hideMarker)
 	rowCount += 1
 
 	local row = Instance.new("Frame")
@@ -641,6 +748,7 @@ local function createSliderRow(parent, name, minValue, maxValue, defaultValue, c
 	marker.AnchorPoint = Vector2.new(0.5, 0)
 	marker.Position = UDim2.new(defaultAlpha, 0, 0, 0)
 	marker.BorderSizePixel = 0
+	marker.Visible = not hideMarker
 	marker.Parent = area
 	registerFade(marker, { BackgroundTransparency = true })
 	onTheme(function(t, a) tweenColor(marker, "BackgroundColor3", t.text, a) end)
@@ -708,20 +816,22 @@ local function createSliderRow(parent, name, minValue, maxValue, defaultValue, c
 	hit.ZIndex = 3
 	hit.Parent = area
 
-	local function setValue(value)
-		if math.abs(value - defaultValue) <= 1.5 then
+	local function setValue(value, silent)
+		if not hideMarker and math.abs(value - defaultValue) <= 1.5 then
 			value = defaultValue
 		end
 		local alpha = (value - minValue) / range
 		knob.Position = UDim2.new(alpha, 0, 0, 16)
 		fill.Size = UDim2.new(alpha, 0, 1, 0)
 		valueLabel.Text = tostring(value)
-		callback(value)
+		if not silent then
+			callback(value)
+		end
 	end
 
 	local function updateFromX(x)
 		local alpha = math.clamp((x - area.AbsolutePosition.X) / area.AbsoluteSize.X, 0, 1)
-		setValue(math.floor(minValue + alpha * range + 0.5))
+		setValue(math.floor(minValue + alpha * range + 0.5), false)
 	end
 
 	valueLabel.Text = tostring(defaultValue)
@@ -746,6 +856,10 @@ local function createSliderRow(parent, name, minValue, maxValue, defaultValue, c
 			updateFromX(input.Position.X)
 		end
 	end)
+
+	return function(value)
+		setValue(value, true)
+	end
 end
 
 local function createWarningRow(parent)
@@ -785,8 +899,9 @@ local function createWarningRow(parent)
 	registerFade(text, { TextTransparency = true })
 end
 
-local function createButtonRow(parent, name, buttonText, callback)
+local function createButtonRow(parent, name, buttonText, callback, buttonWidth)
 	rowCount += 1
+	buttonWidth = buttonWidth or 50
 
 	local row = Instance.new("Frame")
 	row.Name = name .. "Row"
@@ -797,7 +912,7 @@ local function createButtonRow(parent, name, buttonText, callback)
 
 	local label = Instance.new("TextLabel")
 	label.Name = "Label"
-	label.Size = UDim2.new(1, -66, 1, 0)
+	label.Size = UDim2.new(1, -(buttonWidth + 16), 1, 0)
 	label.BackgroundTransparency = 1
 	label.Text = name
 	label.TextSize = 17
@@ -809,12 +924,12 @@ local function createButtonRow(parent, name, buttonText, callback)
 
 	local button = Instance.new("TextButton")
 	button.Name = "Button"
-	button.Size = UDim2.new(0, 50, 0, 28)
+	button.Size = UDim2.new(0, buttonWidth, 0, 28)
 	button.AnchorPoint = Vector2.new(1, 0.5)
 	button.Position = UDim2.new(1, 0, 0.5, 0)
 	button.BorderSizePixel = 0
 	button.Text = buttonText
-	button.TextSize = 20
+	button.TextSize = 18
 	button.Font = Enum.Font.GothamBold
 	button.AutoButtonColor = true
 	button.Parent = row
@@ -1525,43 +1640,55 @@ end
 Players.PlayerAdded:Connect(trackPlayer)
 Players.PlayerRemoving:Connect(untrackPlayer)
 
-local card = createCard()
+local card = createCard(list)
 createToggleRow(card, "ESP", setESP)
 createColorRow(card, "ESP", DEFAULT_ESP_COLOR, setESPColor)
 
-card = createCard()
+card = createCard(list)
 createToggleRow(card, "Names", setNames)
 createColorRow(card, "Names", DEFAULT_NAMES_COLOR, setNamesColor)
 
-card = createCard()
+card = createCard(list)
 createToggleRow(card, "Health", setHealth)
 createColorRow(card, "Health", DEFAULT_HEALTH_COLOR, setHealthColor, ACCENT_PALETTE)
 
-card = createCard()
+card = createCard(list)
 createToggleRow(card, "Boxes ESP", setBoxes)
 createColorRow(card, "Boxes", DEFAULT_BOX_COLOR, setBoxColor)
 
-card = createCard()
+card = createCard(list)
 createToggleRow(card, "Skeleton ESP", setSkeleton)
 createColorRow(card, "Skeleton", DEFAULT_SKELETON_COLOR, setSkeletonColor)
 
-card = createCard()
+card = createCard(list)
 createToggleRow(card, "Lines", setLines)
 createColorRow(card, "Lines", DEFAULT_LINE_COLOR, setLineColor)
 
-card = createCard()
+card = createCard(list)
 createToggleRow(card, "Lock", setLock)
 createWarningRow(card)
 createColorRow(card, "Lock", DEFAULT_LOCKED_COLOR, setLockedLineColor, ACCENT_PALETTE)
 
-card = createCard()
+card = createCard(list)
 createSliderRow(card, "Speed", MIN_SPEED, MAX_SPEED, DEFAULT_SPEED, setSpeed)
 createWarningRow(card)
 
-card = createCard()
+card = createCard(list)
 createButtonRow(card, "Styles", "›", function()
 	showPage("styles")
 end)
+
+local styleStrokes = {}
+
+local function selectStyle(index)
+	for i, stroke in ipairs(styleStrokes) do
+		local selected = (i == index)
+		stroke.Thickness = selected and 3 or 1
+		stroke.Color = selected and THEMES[i].on or THEMES[i].outline
+	end
+end
+
+local openCustom
 
 do
 	local back = Instance.new("TextButton")
@@ -1589,13 +1716,101 @@ do
 		showPage("main")
 	end)
 
+	local customWrap = Instance.new("Frame")
+	customWrap.Name = "CustomWrap"
+	customWrap.Size = UDim2.new(1, 0, 0, 62)
+	customWrap.BackgroundTransparency = 1
+	customWrap.LayoutOrder = 2
+	customWrap.Parent = stylesPage
+
+	local customButton = Instance.new("TextButton")
+	customButton.Name = "CustomButton"
+	customButton.Size = UDim2.new(0.88, 0, 0, 44)
+	customButton.AnchorPoint = Vector2.new(0.5, 0.5)
+	customButton.Position = UDim2.new(0.5, 0, 0.5, 0)
+	customButton.BorderSizePixel = 0
+	customButton.Text = "CUSTOM"
+	customButton.TextSize = 18
+	customButton.Font = Enum.Font.GothamBlack
+	customButton.AutoButtonColor = false
+	customButton.Parent = customWrap
+	registerFade(customButton, { BackgroundTransparency = true, TextTransparency = true })
+	addGradient(customButton, 1, 0.66, 90)
+	onTheme(function(t, a)
+		tweenColor(customButton, "BackgroundColor3", t.button, a)
+		tweenColor(customButton, "TextColor3", t.text, a)
+	end)
+
+	local customCorner = Instance.new("UICorner")
+	customCorner.CornerRadius = UDim.new(0, 14)
+	customCorner.Parent = customButton
+
+	local customScale = Instance.new("UIScale")
+	customScale.Parent = customButton
+
+	local customStroke = Instance.new("UIStroke")
+	customStroke.Color = Color3.new(1, 1, 1)
+	customStroke.Thickness = 3
+	customStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	customStroke.Parent = customButton
+	registerFade(customStroke, { Transparency = true })
+
+	local customShine = Instance.new("UIGradient")
+	customShine.Parent = customStroke
+	onTheme(function(t)
+		customShine.Color = shineSequence(t.outline, t.shine)
+	end)
+
+	local gloss = Instance.new("Frame")
+	gloss.Name = "Gloss"
+	gloss.Size = UDim2.new(1, -6, 0.5, -3)
+	gloss.Position = UDim2.new(0, 3, 0, 3)
+	gloss.BackgroundColor3 = Color3.new(1, 1, 1)
+	gloss.BorderSizePixel = 0
+	gloss.Interactable = false
+	gloss.Parent = customButton
+	registerFade(gloss, { BackgroundTransparency = true })
+
+	local glossCorner = Instance.new("UICorner")
+	glossCorner.CornerRadius = UDim.new(0, 11)
+	glossCorner.Parent = gloss
+
+	local glossGradient = Instance.new("UIGradient")
+	glossGradient.Rotation = 90
+	glossGradient.Transparency = NumberSequence.new(0.8, 1)
+	glossGradient.Parent = gloss
+
+	local shineRotation = 0
+	local shineSpeed = CUSTOM_SHINE_SLOW
+	local shineTarget = CUSTOM_SHINE_SLOW
+
+	RunService.RenderStepped:Connect(function(dt)
+		shineSpeed += (shineTarget - shineSpeed) * math.min(1, dt * 7)
+		shineRotation = (shineRotation + shineSpeed * dt) % 360
+		customShine.Rotation = shineRotation
+	end)
+
+	customButton.MouseEnter:Connect(function()
+		shineTarget = CUSTOM_SHINE_FAST
+		TweenService:Create(customScale, HOVER_TWEEN, { Scale = CUSTOM_HOVER_SCALE }):Play()
+	end)
+
+	customButton.MouseLeave:Connect(function()
+		shineTarget = CUSTOM_SHINE_SLOW
+		TweenService:Create(customScale, HOVER_TWEEN, { Scale = 1 }):Play()
+	end)
+
+	customButton.Activated:Connect(function()
+		openCustom()
+	end)
+
 	local rows = math.ceil(#THEMES / 2)
 
 	local grid = Instance.new("Frame")
 	grid.Name = "StyleGrid"
 	grid.Size = UDim2.new(1, 0, 0, rows * 40 + (rows - 1) * 8)
 	grid.BackgroundTransparency = 1
-	grid.LayoutOrder = 2
+	grid.LayoutOrder = 3
 	grid.Parent = stylesPage
 
 	local gridLayout = Instance.new("UIGridLayout")
@@ -1603,16 +1818,6 @@ do
 	gridLayout.CellPadding = UDim2.fromOffset(10, 8)
 	gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	gridLayout.Parent = grid
-
-	local styleStrokes = {}
-
-	local function selectStyle(index)
-		for i, stroke in ipairs(styleStrokes) do
-			local selected = (i == index)
-			stroke.Thickness = selected and 3 or 1
-			stroke.Color = selected and THEMES[i].on or THEMES[i].outline
-		end
-	end
 
 	for i, theme in ipairs(THEMES) do
 		local button = Instance.new("TextButton")
@@ -1662,6 +1867,228 @@ do
 		if theme == currentTheme then
 			selectStyle(i)
 		end
+	end
+end
+
+do
+	local customBack = Instance.new("TextButton")
+	customBack.Name = "Back"
+	customBack.Size = UDim2.new(0, 84, 0, 28)
+	customBack.BorderSizePixel = 0
+	customBack.Text = "‹ Back"
+	customBack.TextSize = 15
+	customBack.Font = Enum.Font.GothamBold
+	customBack.AutoButtonColor = true
+	customBack.LayoutOrder = 1
+	customBack.Parent = customPage
+	registerFade(customBack, { BackgroundTransparency = true, TextTransparency = true })
+	addGradient(customBack, 1, 0.8, 90)
+	onTheme(function(t, a)
+		tweenColor(customBack, "BackgroundColor3", t.button, a)
+		tweenColor(customBack, "TextColor3", t.text, a)
+	end)
+
+	local customBackCorner = Instance.new("UICorner")
+	customBackCorner.CornerRadius = UDim.new(0, 9)
+	customBackCorner.Parent = customBack
+
+	customBack.Activated:Connect(function()
+		showPage("styles")
+	end)
+
+	local fieldCard = createCard(customPage)
+
+	local fieldGrid = Instance.new("Frame")
+	fieldGrid.Name = "FieldGrid"
+	fieldGrid.Size = UDim2.new(1, 0, 0, 5 * 34 + 4 * 8)
+	fieldGrid.BackgroundTransparency = 1
+	fieldGrid.LayoutOrder = 1
+	fieldGrid.Parent = fieldCard
+
+	local fieldLayout = Instance.new("UIGridLayout")
+	fieldLayout.CellSize = UDim2.new(0.5, -4, 0, 34)
+	fieldLayout.CellPadding = UDim2.fromOffset(8, 8)
+	fieldLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	fieldLayout.Parent = fieldGrid
+
+	local editCard = createCard(customPage)
+
+	local previewRow = Instance.new("Frame")
+	previewRow.Name = "PreviewRow"
+	previewRow.Size = UDim2.new(1, 0, 0, 34)
+	previewRow.BackgroundTransparency = 1
+	previewRow.LayoutOrder = 1
+	previewRow.Parent = editCard
+
+	local previewSwatch = Instance.new("Frame")
+	previewSwatch.Name = "Preview"
+	previewSwatch.Size = UDim2.new(0, 64, 0, 28)
+	previewSwatch.AnchorPoint = Vector2.new(0, 0.5)
+	previewSwatch.Position = UDim2.new(0, 0, 0.5, 0)
+	previewSwatch.BorderSizePixel = 0
+	previewSwatch.Parent = previewRow
+	registerFade(previewSwatch, { BackgroundTransparency = true })
+
+	local previewCorner = Instance.new("UICorner")
+	previewCorner.CornerRadius = UDim.new(0, 8)
+	previewCorner.Parent = previewSwatch
+
+	local previewStroke = Instance.new("UIStroke")
+	previewStroke.Thickness = 1
+	previewStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	previewStroke.Parent = previewSwatch
+	registerFade(previewStroke, { Transparency = true })
+	onTheme(function(t, a) tweenColor(previewStroke, "Color", t.text, a) end)
+
+	local hexLabel = Instance.new("TextLabel")
+	hexLabel.Name = "Hex"
+	hexLabel.Size = UDim2.new(1, -74, 1, 0)
+	hexLabel.Position = UDim2.new(0, 74, 0, 0)
+	hexLabel.BackgroundTransparency = 1
+	hexLabel.TextSize = 13
+	hexLabel.Font = Enum.Font.GothamBold
+	hexLabel.TextXAlignment = Enum.TextXAlignment.Left
+	hexLabel.Parent = previewRow
+	registerFade(hexLabel, { TextTransparency = true })
+	onTheme(function(t, a) tweenColor(hexLabel, "TextColor3", t.text, a) end)
+
+	local selectedField = CUSTOM_FIELDS[1]
+	local dots = {}
+	local fieldStrokes = {}
+	local setRed, setGreen, setBlue, setGradientToggle
+
+	local function refreshCustomEditor()
+		local color = CUSTOM_THEME[selectedField.key]
+		previewSwatch.BackgroundColor3 = color
+		hexLabel.Text = selectedField.label .. "  #" .. color:ToHex():upper()
+		setRed(math.floor(color.R * 255 + 0.5))
+		setGreen(math.floor(color.G * 255 + 0.5))
+		setBlue(math.floor(color.B * 255 + 0.5))
+		setGradientToggle(CUSTOM_THEME.gradient)
+
+		for key, dot in pairs(dots) do
+			dot.BackgroundColor3 = CUSTOM_THEME[key]
+		end
+		for key, stroke in pairs(fieldStrokes) do
+			stroke.Thickness = (key == selectedField.key) and 2 or 0
+		end
+	end
+
+	local function onChannel(channel, value)
+		local color = CUSTOM_THEME[selectedField.key]
+		local r = math.floor(color.R * 255 + 0.5)
+		local g = math.floor(color.G * 255 + 0.5)
+		local b = math.floor(color.B * 255 + 0.5)
+
+		if channel == "r" then
+			r = value
+		elseif channel == "g" then
+			g = value
+		else
+			b = value
+		end
+
+		local newColor = Color3.fromRGB(r, g, b)
+		CUSTOM_THEME[selectedField.key] = newColor
+		refreshCustomDerived()
+		selectStyle(nil)
+		applyTheme(CUSTOM_THEME, true)
+
+		previewSwatch.BackgroundColor3 = newColor
+		hexLabel.Text = selectedField.label .. "  #" .. newColor:ToHex():upper()
+		dots[selectedField.key].BackgroundColor3 = newColor
+	end
+
+	for index, field in ipairs(CUSTOM_FIELDS) do
+		local button = Instance.new("TextButton")
+		button.Name = "Field_" .. field.key
+		button.BorderSizePixel = 0
+		button.Text = field.label
+		button.TextSize = 12
+		button.Font = Enum.Font.GothamBold
+		button.TextXAlignment = Enum.TextXAlignment.Left
+		button.AutoButtonColor = true
+		button.LayoutOrder = index
+		button.Parent = fieldGrid
+		registerFade(button, { BackgroundTransparency = true, TextTransparency = true })
+		addGradient(button, 1, 0.8, 90)
+		onTheme(function(t, a)
+			tweenColor(button, "BackgroundColor3", t.button, a)
+			tweenColor(button, "TextColor3", t.text, a)
+		end)
+
+		local fieldPadding = Instance.new("UIPadding")
+		fieldPadding.PaddingLeft = UDim.new(0, 10)
+		fieldPadding.Parent = button
+
+		local fieldCorner = Instance.new("UICorner")
+		fieldCorner.CornerRadius = UDim.new(0, 9)
+		fieldCorner.Parent = button
+
+		local ring = Instance.new("UIStroke")
+		ring.Thickness = 0
+		ring.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		ring.Parent = button
+		registerFade(ring, { Transparency = true })
+		onTheme(function(t, a) tweenColor(ring, "Color", t.on, a) end)
+		fieldStrokes[field.key] = ring
+
+		local dot = Instance.new("Frame")
+		dot.Size = UDim2.new(0, 12, 0, 12)
+		dot.AnchorPoint = Vector2.new(1, 0.5)
+		dot.Position = UDim2.new(1, -8, 0.5, 0)
+		dot.BackgroundColor3 = CUSTOM_THEME[field.key]
+		dot.BorderSizePixel = 0
+		dot.Parent = button
+		registerFade(dot, { BackgroundTransparency = true })
+		dots[field.key] = dot
+
+		local dotCorner = Instance.new("UICorner")
+		dotCorner.CornerRadius = UDim.new(0.5, 0)
+		dotCorner.Parent = dot
+
+		button.Activated:Connect(function()
+			selectedField = field
+			refreshCustomEditor()
+		end)
+	end
+
+	setRed = createSliderRow(editCard, "Red", 0, 255, 0, function(value)
+		onChannel("r", value)
+	end, true)
+
+	setGreen = createSliderRow(editCard, "Green", 0, 255, 0, function(value)
+		onChannel("g", value)
+	end, true)
+
+	setBlue = createSliderRow(editCard, "Blue", 0, 255, 0, function(value)
+		onChannel("b", value)
+	end, true)
+
+	setGradientToggle = createToggleRow(editCard, "Gradient", function(on)
+		CUSTOM_THEME.gradient = on
+		selectStyle(nil)
+		applyTheme(CUSTOM_THEME, true)
+	end, CUSTOM_THEME.gradient)
+
+	createButtonRow(editCard, "Defaults", "Reset", function()
+		seedCustom(THEMES[2])
+		selectStyle(nil)
+		applyTheme(CUSTOM_THEME)
+		refreshCustomEditor()
+	end, 70)
+
+	openCustom = function()
+		if not customSeeded then
+			customSeeded = true
+			if not currentTheme.custom then
+				seedCustom(currentTheme)
+			end
+		end
+		selectStyle(nil)
+		applyTheme(CUSTOM_THEME)
+		showPage("custom")
+		refreshCustomEditor()
 	end
 end
 
@@ -1742,6 +2169,7 @@ local function createKeyGate()
 	versionLabel.Visible = false
 	list.Visible = false
 	stylesPage.Visible = false
+	customPage.Visible = false
 
 	local box = Instance.new("TextBox")
 	box.Name = "KeyBox"
