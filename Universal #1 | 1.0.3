@@ -2,14 +2,6 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-local HttpService = game:GetService("HttpService")
-
-local writeFile = writefile
-local readFile = readfile
-local isFile = isfile
-local deleteFile = delfile
-local copyToClipboard = setclipboard or toclipboard
-local canSave = writeFile ~= nil and readFile ~= nil and isFile ~= nil
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -25,13 +17,11 @@ local SHINE_TWEEN = TweenInfo.new(2.6, Enum.EasingStyle.Linear, Enum.EasingDirec
 
 local ACCESS_KEY = "KivsScriptsUni1"
 local DISCORD_TEXT = "discord.gg/9xYm9gmUq9"
-local INVITE_LINK = "https://discord.gg/9xYm9gmUq9"
-local SAVE_FILE = "UniversalGui_CustomStyle.json"
 local DEFAULT_STYLE = "Classic"
 
 local HEADER_TEXT = "Universal #1"
 local WATERMARK_TEXT = "By Kivs"
-local VERSION_TEXT = "1.4.0"
+local VERSION_TEXT = "1.3.0"
 
 local WARNING_ICON = "⚠"
 local WARNING_TEXT = "WARNING - THIS OPTION HAS HIGH RISK OF A BAN. USE AT YOUR OWN RISK."
@@ -256,92 +246,6 @@ end
 
 seedCustom(THEMES[2])
 
-local function readSavedStyle()
-	if not canSave then
-		return nil
-	end
-
-	local ok, decoded = pcall(function()
-		if not isFile(SAVE_FILE) then
-			return nil
-		end
-		return HttpService:JSONDecode(readFile(SAVE_FILE))
-	end)
-
-	if not ok or type(decoded) ~= "table" then
-		return nil
-	end
-
-	local colors = {}
-	for _, field in ipairs(CUSTOM_FIELDS) do
-		local hex = decoded[field.key]
-		if type(hex) ~= "string" then
-			return nil
-		end
-		local valid, color = pcall(Color3.fromHex, hex)
-		if not valid then
-			return nil
-		end
-		colors[field.key] = color
-	end
-
-	return colors, decoded.gradient ~= false
-end
-
-local function writeSavedStyle()
-	if not canSave then
-		return false
-	end
-
-	local data = { gradient = CUSTOM_THEME.gradient }
-	for _, field in ipairs(CUSTOM_FIELDS) do
-		data[field.key] = CUSTOM_THEME[field.key]:ToHex()
-	end
-
-	local ok = pcall(function()
-		writeFile(SAVE_FILE, HttpService:JSONEncode(data))
-	end)
-	return ok
-end
-
-local function deleteSavedStyle()
-	if not canSave then
-		return false
-	end
-
-	local ok = pcall(function()
-		if deleteFile then
-			if isFile(SAVE_FILE) then
-				deleteFile(SAVE_FILE)
-			end
-		else
-			writeFile(SAVE_FILE, "")
-		end
-	end)
-	return ok
-end
-
-local savedColors, savedGradient = readSavedStyle()
-local hasSavedStyle = savedColors ~= nil
-
-if hasSavedStyle then
-	for key, color in pairs(savedColors) do
-		CUSTOM_THEME[key] = color
-	end
-	CUSTOM_THEME.gradient = savedGradient
-	refreshCustomDerived()
-	currentTheme = CUSTOM_THEME
-	customSeeded = true
-end
-
-local function copyInvite()
-	if not copyToClipboard then
-		return false
-	end
-	local ok = pcall(copyToClipboard, INVITE_LINK)
-	return ok
-end
-
 local function tweenColor(obj, prop, value, animate)
 	if animate then
 		TweenService:Create(obj, THEME_TWEEN, { [prop] = value }):Play()
@@ -464,20 +368,6 @@ local function fadeList(items, target, animate)
 			end
 		end
 	end
-end
-
-local flashTokens = {}
-
-local function flashButton(button, message, original)
-	flashTokens[button] = (flashTokens[button] or 0) + 1
-	local myToken = flashTokens[button]
-	button.Text = message
-
-	task.delay(1.5, function()
-		if flashTokens[button] == myToken and button.Parent then
-			button.Text = original
-		end
-	end)
 end
 
 local function isPressTypeInput(input)
@@ -1197,28 +1087,7 @@ local function createWarningRow(parent)
 	registerFade(text, { TextTransparency = true })
 end
 
-local function createNoteRow(parent, text)
-	rowCount += 1
-
-	local note = Instance.new("TextLabel")
-	note.Name = "Note" .. rowCount
-	note.Size = UDim2.new(1, 0, 0, 28)
-	note.BackgroundTransparency = 1
-	note.Text = text
-	note.TextSize = 11
-	note.Font = Enum.Font.GothamMedium
-	note.TextWrapped = true
-	note.TextXAlignment = Enum.TextXAlignment.Left
-	note.TextYAlignment = Enum.TextYAlignment.Center
-	note.LayoutOrder = rowCount
-	note.Parent = parent
-	registerFade(note, { TextTransparency = true })
-	onTheme(function(t, a) tweenColor(note, "TextColor3", t.sub, a) end)
-
-	return note
-end
-
-local function createButtonRow(parent, name, buttonText, callback, buttonWidth, textSize)
+local function createButtonRow(parent, name, buttonText, callback, buttonWidth)
 	rowCount += 1
 	buttonWidth = buttonWidth or 50
 
@@ -1248,7 +1117,7 @@ local function createButtonRow(parent, name, buttonText, callback, buttonWidth, 
 	button.Position = UDim2.new(1, 0, 0.5, 0)
 	button.BorderSizePixel = 0
 	button.Text = buttonText
-	button.TextSize = textSize or 18
+	button.TextSize = 18
 	button.Font = Enum.Font.GothamBold
 	button.AutoButtonColor = true
 	button.Parent = row
@@ -1264,8 +1133,6 @@ local function createButtonRow(parent, name, buttonText, callback, buttonWidth, 
 	buttonCorner.Parent = button
 
 	button.Activated:Connect(callback)
-
-	return button
 end
 
 local espEnabled = false
@@ -1935,13 +1802,6 @@ card = createCard(list)
 createSliderRow(card, "Max Distance", MIN_DISTANCE, MAX_DISTANCE_LIMIT, DEFAULT_MAX_DISTANCE, setMaxDistance, false, 10, " studs")
 
 card = createCard(list)
-local discordButton
-discordButton = createButtonRow(card, "Discord", "Copy", function()
-	flashButton(discordButton, copyInvite() and "Copied" or "Failed", "Copy")
-end, 70, 14)
-createNoteRow(card, DISCORD_TEXT)
-
-card = createCard(list)
 createButtonRow(card, "Styles", "›", function()
 	showPage("styles")
 end)
@@ -2131,13 +1991,11 @@ do
 		end)
 	end
 
-	local activeIndex = nil
 	for i, theme in ipairs(THEMES) do
 		if theme == currentTheme then
-			activeIndex = i
+			selectStyle(i)
 		end
 	end
-	selectStyle(activeIndex)
 end
 
 do
@@ -2226,19 +2084,6 @@ do
 	local dots = {}
 	local fieldStrokes = {}
 	local setRed, setGreen, setBlue, setGradientToggle
-	local saveNote
-	local saveButton
-	local deleteButton
-
-	local function refreshSaveNote()
-		if not canSave then
-			saveNote.Text = "Saving isn't available in this environment."
-		elseif hasSavedStyle then
-			saveNote.Text = "A saved style loads automatically when the GUI starts."
-		else
-			saveNote.Text = "Press Save to keep this style for next time."
-		end
-	end
 
 	local function refreshCustomEditor()
 		local color = CUSTOM_THEME[selectedField.key]
@@ -2359,38 +2204,7 @@ do
 		selectStyle(nil)
 		applyTheme(CUSTOM_THEME)
 		refreshCustomEditor()
-	end, 70, 14)
-
-	saveButton = createButtonRow(editCard, "Save style", "Save", function()
-		if not canSave then
-			flashButton(saveButton, "N/A", "Save")
-			return
-		end
-
-		local ok = writeSavedStyle()
-		if ok then
-			hasSavedStyle = true
-		end
-		flashButton(saveButton, ok and "Saved" or "Failed", "Save")
-		refreshSaveNote()
-	end, 70, 14)
-
-	deleteButton = createButtonRow(editCard, "Saved style", "Delete", function()
-		if not canSave then
-			flashButton(deleteButton, "N/A", "Delete")
-			return
-		end
-
-		local ok = deleteSavedStyle()
-		if ok then
-			hasSavedStyle = false
-		end
-		flashButton(deleteButton, ok and "Deleted" or "Failed", "Delete")
-		refreshSaveNote()
-	end, 70, 14)
-
-	saveNote = createNoteRow(editCard, "")
-	refreshSaveNote()
+	end, 70)
 
 	openCustom = function()
 		if not customSeeded then
@@ -2512,54 +2326,28 @@ local function createKeyGate()
 	boxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	boxStroke.Parent = box
 
-	local introLabel = Instance.new("TextLabel")
-	introLabel.Name = "KeyIntro"
-	introLabel.Size = UDim2.new(1, -48, 0, 16)
-	introLabel.AnchorPoint = Vector2.new(0.5, 0)
-	introLabel.Position = UDim2.new(0.5, 0, 0, 84)
-	introLabel.BackgroundTransparency = 1
-	introLabel.Text = "Get the script-specific key at"
-	introLabel.TextColor3 = currentTheme.text
-	introLabel.TextSize = 13
-	introLabel.Font = Enum.Font.GothamMedium
-	introLabel.Parent = frame
+	local linkHex = "#" .. currentTheme.knob:ToHex()
 
-	local linkText = "<u>" .. DISCORD_TEXT .. "</u>"
-
-	local linkButton = Instance.new("TextButton")
-	linkButton.Name = "KeyLink"
-	linkButton.Size = UDim2.new(0, 210, 0, 26)
-	linkButton.AnchorPoint = Vector2.new(0.5, 0)
-	linkButton.Position = UDim2.new(0.5, 0, 0, 104)
-	linkButton.BackgroundColor3 = currentTheme.button
-	linkButton.BorderSizePixel = 0
-	linkButton.AutoButtonColor = false
-	linkButton.RichText = true
-	linkButton.Text = linkText
-	linkButton.TextColor3 = currentTheme.knob
-	linkButton.TextSize = 13
-	linkButton.Font = Enum.Font.GothamBold
-	linkButton.Parent = frame
-	addGradient(linkButton, 1, 0.8, 90)
-
-	local linkCorner = Instance.new("UICorner")
-	linkCorner.CornerRadius = UDim.new(0, 9)
-	linkCorner.Parent = linkButton
-
-	local linkStroke = Instance.new("UIStroke")
-	linkStroke.Color = currentTheme.outline
-	linkStroke.Thickness = 1
-	linkStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	linkStroke.Parent = linkButton
-
-	local linkScale = Instance.new("UIScale")
-	linkScale.Parent = linkButton
+	local linkLabel = Instance.new("TextLabel")
+	linkLabel.Name = "KeyLink"
+	linkLabel.Size = UDim2.new(1, -48, 0, 34)
+	linkLabel.AnchorPoint = Vector2.new(0.5, 0)
+	linkLabel.Position = UDim2.new(0.5, 0, 0, 86)
+	linkLabel.BackgroundTransparency = 1
+	linkLabel.RichText = true
+	linkLabel.Text = 'Get the script-specific key at <font color="' .. linkHex .. '"><b><u>' .. DISCORD_TEXT .. "</u></b></font>"
+	linkLabel.TextColor3 = currentTheme.text
+	linkLabel.TextSize = 13
+	linkLabel.Font = Enum.Font.GothamMedium
+	linkLabel.TextWrapped = true
+	linkLabel.TextYAlignment = Enum.TextYAlignment.Top
+	linkLabel.Parent = frame
 
 	local errorLabel = Instance.new("TextLabel")
 	errorLabel.Name = "Error"
 	errorLabel.Size = UDim2.new(1, -48, 0, 20)
 	errorLabel.AnchorPoint = Vector2.new(0.5, 0)
-	errorLabel.Position = UDim2.new(0.5, 0, 0, 140)
+	errorLabel.Position = UDim2.new(0.5, 0, 0, 128)
 	errorLabel.BackgroundTransparency = 1
 	errorLabel.Text = ""
 	errorLabel.TextColor3 = WARNING_COLOR
@@ -2570,37 +2358,12 @@ local function createKeyGate()
 	local gateEntries = {
 		{ box, { BackgroundTransparency = true, TextTransparency = true } },
 		{ boxStroke, { Transparency = true } },
-		{ introLabel, { TextTransparency = true } },
-		{ linkButton, { BackgroundTransparency = true, TextTransparency = true } },
-		{ linkStroke, { Transparency = true } },
+		{ linkLabel, { TextTransparency = true } },
 		{ errorLabel, { TextTransparency = true } },
 	}
 	for _, entry in ipairs(gateEntries) do
 		table.insert(shellItems, entry)
 	end
-
-	local linkId = 0
-
-	linkButton.MouseEnter:Connect(function()
-		TweenService:Create(linkScale, HOVER_TWEEN, { Scale = 1.06 }):Play()
-	end)
-
-	linkButton.MouseLeave:Connect(function()
-		TweenService:Create(linkScale, HOVER_TWEEN, { Scale = 1 }):Play()
-	end)
-
-	linkButton.Activated:Connect(function()
-		local copied = copyInvite()
-		linkId += 1
-		local myId = linkId
-		linkButton.Text = copied and "Copied to clipboard" or "Clipboard not supported"
-
-		task.delay(1.6, function()
-			if linkId == myId and linkButton.Parent then
-				linkButton.Text = linkText
-			end
-		end)
-	end)
 
 	local finished = false
 	local flashId = 0
@@ -2608,9 +2371,7 @@ local function createKeyGate()
 	local function openGui()
 		TweenService:Create(box, TWEEN_INFO, { BackgroundTransparency = 1, TextTransparency = 1 }):Play()
 		TweenService:Create(boxStroke, TWEEN_INFO, { Transparency = 1 }):Play()
-		TweenService:Create(introLabel, TWEEN_INFO, { TextTransparency = 1 }):Play()
-		TweenService:Create(linkButton, TWEEN_INFO, { BackgroundTransparency = 1, TextTransparency = 1 }):Play()
-		TweenService:Create(linkStroke, TWEEN_INFO, { Transparency = 1 }):Play()
+		TweenService:Create(linkLabel, TWEEN_INFO, { TextTransparency = 1 }):Play()
 
 		unlocked = true
 		refreshOutline()
@@ -2633,8 +2394,7 @@ local function createKeyGate()
 				end
 			end
 			box:Destroy()
-			introLabel:Destroy()
-			linkButton:Destroy()
+			linkLabel:Destroy()
 			errorLabel:Destroy()
 		end)
 	end
